@@ -95,6 +95,11 @@ def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = 
     """Acknowledge a callback query and show a notification or alert to the user."""
     if not TELEGRAM_BOT_TOKEN:
         return False
+
+    # Telegram API strictly limits answerCallbackQuery text to 200 characters
+    if text and len(text) > 200:
+        text = text[:197] + "..."
+
     url = f"{TELEGRAM_API}/answerCallbackQuery"
     payload = {
         "callback_query_id": callback_query_id,
@@ -108,6 +113,7 @@ def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = 
     except Exception as e:
         logger.warning(f"Failed to answer callback query {callback_query_id}: {e}")
         return False
+
 
 if __name__ == "__main__":
     # Example usage
