@@ -70,6 +70,28 @@ create index if not exists idx_request_audit_endpoint_created_at
 on request_audit (endpoint, created_at desc);
 ```
 
+### C. User Quiz Answers (Track User Selections)
+```sql
+create table if not exists user_quiz_answers (
+  id bigint generated always as identity primary key,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  poll_id text,                         -- Nullable, used for native Telegram polls
+  quiz_id bigint,                       -- Nullable, references quiz_history.id for inline buttons
+  user_id bigint not null,
+  username text,
+  selected_option_id integer not null,
+  is_correct boolean,
+  unique (poll_id, user_id),
+  unique (quiz_id, user_id)
+);
+
+create index if not exists idx_user_quiz_answers_poll_id 
+on user_quiz_answers (poll_id);
+
+create index if not exists idx_user_quiz_answers_quiz_id 
+on user_quiz_answers (quiz_id);
+```
+
 ---
 
 ## 3. Environment Variables

@@ -50,7 +50,8 @@ Use curl to register your Vercel deployment URL with Telegram (replace placehold
 ```bash
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
      -H "Content-Type: application/json" \
-     -d '{"url": "https://<your-vercel-domain>.vercel.app/api/telegram", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["message"]}'
+     -d '{"url": "https://<your-vercel-domain>.vercel.app/api/telegram", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["message", "callback_query"]}'
+
 ```
 
 ---

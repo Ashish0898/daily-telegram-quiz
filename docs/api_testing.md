@@ -110,7 +110,63 @@ print("HTML Content Length:", len(response.text))
 
 ---
 
+## 4. Simulate Inline Button Click (/api/telegram)
+When testing in `"inline"` quiz format mode, clicking A, B, C, or D buttons triggers a `callback_query` event. You can simulate this button click with the following templates:
+
+### curl
+```bash
+curl -X POST http://localhost:3001/api/telegram \
+  -H "Content-Type: application/json" \
+  -H "X-Telegram-Bot-Api-Secret-Token: your_webhook_secret_token" \
+  -d '{
+    "callback_query": {
+      "id": "mock_cb_12345",
+      "from": {
+        "id": 123456789,
+        "username": "test_user"
+      },
+      "message": {
+        "message_id": 999,
+        "chat": {
+          "id": 987654321
+        }
+      },
+      "data": "qa:1:3:12"
+    }
+  }'
+```
+
+### Python
+```python
+import requests
+
+url = "http://localhost:3001/api/telegram"
+headers = {
+    "Content-Type": "application/json",
+    "X-Telegram-Bot-Api-Secret-Token": "your_webhook_secret_token"
+}
+payload = {
+    "callback_query": {
+      "id": "mock_cb_12345",
+      "from": {
+        "id": 123456789,
+        "username": "test_user"
+      },
+      "message": {
+        "message_id": 999,
+        "chat": { "id": 987654321 }
+      },
+      "data": "qa:1:3:12"
+    }
+}
+
+response = requests.post(url, json=payload, headers=headers)
+print("Status:", response.status_code)
+```
+
+---
+
 ## 💡 Troubleshooting
 * **`ignored_secret_mismatch` Response**: Ensure that you are passing the header `X-Telegram-Bot-Api-Secret-Token` exactly matching the `TELEGRAM_WEBHOOK_SECRET` environment variable.
-* **`ignored_unauthorized_user` Response**: The user ID passed in `message.from.id` is not on the allowed list. Make sure the ID matches an ID in the `TELEGRAM_ADMIN_USER_IDS` variable or has been allowed via `/allow` command.
-* **`500 Internal Server Error`**: Check server logs. This usually indicates that the database table setup has not been finalized (e.g. missing `public.quiz_history` or `public.allowed_users` tables). Follow [docs/supabase_setup.md](supabase_setup.md) to initialize the schema.
+* **`ignored_unauthorized_user` Response**: The user ID passed in `message.from.id` or `callback_query.from.id` is not on the allowed list. Make sure the ID matches an ID in the `TELEGRAM_ADMIN_USER_IDS` variable or has been allowed via `/allow` command.
+* **`500 Internal Server Error`**: Check server logs. This usually indicates that the database table setup has not been finalized (e.g. missing `public.quiz_history`, `public.allowed_users`, or `public.user_quiz_answers` tables). Follow [docs/supabase_setup.md](supabase_setup.md) to initialize the schema.
