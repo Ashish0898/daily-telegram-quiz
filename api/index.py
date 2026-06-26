@@ -401,49 +401,81 @@ class handler(BaseHTTPRequestHandler):
     def handle_quiz_trigger(self):
         """Handle GET/POST requests from Vercel Crons or manual invokes to send daily quiz."""
         start_time = time.time()
-        logger.info("Incoming GET request for daily quiz cron scheduler.")
-
-        if not TELEGRAM_CHAT_ID:
-            logger.error("TELEGRAM_CHAT_ID is not configured.")
-            self.send_json(500, {"error": "TELEGRAM_CHAT_ID is not set"})
-            log_request(
-                endpoint="quiz_scheduler",
-                status="error",
-                error_message="TELEGRAM_CHAT_ID is not configured in env variables",
-                execution_time_ms=int((time.time() - start_time) * 1000)
-            )
-            return
+        logger.info("Incoming GET/POST request for daily quiz cron scheduler.")
 
         try:
-            # Generate and Send Quiz
+            # Generate Quiz once to share across all users
             quiz_data = generate_quiz()
-            poll_resp = send_poll(
-                chat_id=int(TELEGRAM_CHAT_ID),
-                question=quiz_data["question"],
-                options=quiz_data["options"],
-                correct_option_id=quiz_data["correct_option_id"],
-                explanation=quiz_data["explanation"],
-                is_anonymous=True # Anonymous for public daily chats (often preferred so users can vote privately)
-            )
+            
+            # Fetch active allowed users to send the quiz to
+            active_users = [u for u in get_all_users() if u.get("is_active")]
+            
+            # Collect unique user/chat IDs to send the quiz to
+            target_ids = set()
+            for user in active_users:
+                uid = user.get("user_id")
+                if uid:
+                    target_ids.add(int(uid))
 
-            # Log to DB
-            poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+            # Also add the main TELEGRAM_CHAT_ID if configured
+            if TELEGRAM_CHAT_ID:
+                try:
+                    target_ids.add(int(TELEGRAM_CHAT_ID))
+                except ValueError:
+                    pass
+
+            if not target_ids:
+                logger.error("No target chat or users found to send the quiz to.")
+                self.send_json(400, {"error": "No active allowed users or TELEGRAM_CHAT_ID configured"})
+                return
+
+            sent_count = 0
+            errors = []
+            poll_id_to_save = None
+
+            for chat_id in target_ids:
+                try:
+                    poll_resp = send_poll(
+                        chat_id=chat_id,
+                        question=quiz_data["question"],
+                        options=quiz_data["options"],
+                        correct_option_id=quiz_data["correct_option_id"],
+                        explanation=quiz_data["explanation"],
+                        is_anonymous=True
+                    )
+                    sent_count += 1
+                    # Save the poll ID returned for history tracking
+                    if poll_resp and not poll_id_to_save:
+                        poll_id_to_save = poll_resp.get("result", {}).get("poll", {}).get("id")
+                except Exception as e:
+                    logger.error(f"Failed to send poll to chat {chat_id}: {e}")
+                    errors.append(f"{chat_id}: {str(e)}")
+
+            # Save to database histories (use tracked poll ID if available)
             save_quiz_to_history(
                 question=quiz_data["question"],
                 options=quiz_data["options"],
                 correct_option_id=quiz_data["correct_option_id"],
                 explanation=quiz_data["explanation"],
                 category=quiz_data["category"],
-                poll_id=poll_id
+                poll_id=poll_id_to_save
             )
 
-            self.send_json(200, {"ok": True, "quiz": quiz_data["question"]})
+            response_data = {
+                "ok": True,
+                "quiz": quiz_data["question"],
+                "sent_count": sent_count,
+            }
+            if errors:
+                response_data["errors"] = errors
+
+            self.send_json(200, response_data)
             log_request(
                 endpoint="quiz_scheduler",
-                status="success",
-                chat_id=int(TELEGRAM_CHAT_ID),
+                status="success" if sent_count > 0 else "error",
+                chat_id=list(target_ids)[0] if target_ids else None,
                 command="scheduler_run",
-                response_content=f"Quiz Poll Sent: '{quiz_data['question']}'",
+                response_content=json.dumps(response_data),
                 topic=quiz_data["category"],
                 execution_time_ms=int((time.time() - start_time) * 1000)
             )
@@ -454,7 +486,6 @@ class handler(BaseHTTPRequestHandler):
             log_request(
                 endpoint="quiz_scheduler",
                 status="error",
-                chat_id=int(TELEGRAM_CHAT_ID) if TELEGRAM_CHAT_ID else None,
                 command="scheduler_run",
                 error_message=str(e),
                 execution_time_ms=int((time.time() - start_time) * 1000)
