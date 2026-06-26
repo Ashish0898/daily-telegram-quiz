@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Telegram Quiz Bot — Interactive Tech & Logic Trivia</title>
+  <meta name="description" content="Generate and deliver interactive daily technical and logic trivia to Telegram channels and groups using native quiz polls, GitHub LLMs, and Supabase.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Outfit:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --primary-rgb: 59, 130, 246;
+      --secondary: #10b981;
+      --secondary-rgb: 16, 185, 129;
+      --accent: #f59e0b;
+      --accent-rgb: 245, 158, 11;
+      --bg-dark: #080c14;
+      --bg-card: rgba(15, 23, 42, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      overflow-x: hidden;
+      scroll-behavior: smooth;
+    }
+
+    /* Background mesh/gradients */
+    .bg-glows {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      overflow: hidden;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .glow-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(140px);
+      opacity: 0.12;
+      animation: float 20s infinite alternate;
+    }
+
+    .glow-1 {
+      top: -10%;
+      left: 10%;
+      width: 50vw;
+      height: 50vw;
+      background: radial-gradient(circle, rgba(var(--primary-rgb), 0.8) 0%, transparent 80%);
+    }
+
+    .glow-2 {
+      bottom: 20%;
+      right: -10%;
+      width: 45vw;
+      height: 45vw;
+      background: radial-gradient(circle, rgba(var(--secondary-rgb), 0.8) 0%, transparent 80%);
+      animation-delay: -5s;
+    }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) scale(1); }
+      100% { transform: translate(40px, 20px) scale(1.08); }
+    }
+
+    .grid-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+      background-size: 50px 50px;
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    /* Container & Layout */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 2rem;
+    }
+
+    /* Header & Navigation */
+    header {
+      padding: 1.5rem 0;
+      border-bottom: 1px solid var(--border-color);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background-color: rgba(8, 12, 20, 0.7);
+    }
+
+    .nav-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      font-size: 1.5rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: linear-gradient(135deg, var(--text-main) 30%, var(--text-muted));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+
+    .logo-icon {
+      color: var(--primary);
+      font-size: 1.7rem;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+      align-items: center;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: var(--transition);
+    }
+
+    .nav-links a:hover {
+      color: var(--text-main);
+    }
+
+    .btn-portal {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      padding: 0.6rem 1.2rem;
+      border-radius: 9999px;
+      color: var(--text-main) !important;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: var(--transition);
+    }
+
+    .btn-portal:hover {
+      background: rgba(var(--primary-rgb), 0.1);
+      border-color: var(--primary);
+      box-shadow: 0 0 15px rgba(var(--primary-rgb), 0.2);
+    }
+
+    /* Hero Section */
+    .hero {
+      padding: 6rem 0 4rem;
+      position: relative;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 4rem;
+      align-items: center;
+    }
+
+    .hero-content h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .gradient-text {
+      background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .hero-content p {
+      font-size: 1.15rem;
+      line-height: 1.6;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+      max-width: 550px;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 0.85rem 1.8rem;
+      border-radius: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+      transition: var(--transition);
+      font-size: 1rem;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+      color: white;
+      box-shadow: 0 4px 20px rgba(var(--primary-rgb), 0.35);
+      border: none;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(var(--primary-rgb), 0.5);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.03);
+      border-color: var(--text-muted);
+      transform: translateY(-2px);
+    }
+
+    /* Mockup Interface */
+    .mockup-wrapper {
+      position: relative;
+    }
+
+    .device-mockup {
+      width: 100%;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 1.2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .device-mockup::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+      pointer-events: none;
+    }
+
+    .bot-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+      margin-bottom: 1.2rem;
+    }
+
+    .bot-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.2) 0%, rgba(var(--secondary-rgb), 0.2) 100%);
+      border: 1.5px solid var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      font-size: 1.2rem;
+    }
+
+    .bot-status {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .bot-status h3 {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .bot-status span {
+      font-size: 0.75rem;
+      color: var(--secondary);
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .bot-status span::before {
+      content: '';
+      display: inline-block;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--secondary);
+    }
+
+    .chat-area {
+      height: 330px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding-right: 0.5rem;
+    }
+
+    /* Scrollbar */
+    .chat-area::-webkit-scrollbar {
+      width: 4px;
+    }
+    .chat-area::-webkit-scrollbar-thumb {
+      background: var(--border-color);
+      border-radius: 99px;
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      border-radius: 16px;
+      padding: 0.9rem 1.1rem;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .msg-user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .msg-bot {
+      align-self: flex-start;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-top-left-radius: 4px;
+    }
+
+    .msg-bot b {
+      color: var(--accent);
+    }
+
+    .msg-bot code {
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 0.82rem;
+      color: #93c5fd;
+    }
+
+    /* Simulated Poll Element */
+    .sim-poll {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1.5px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.2rem;
+      margin-top: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.8rem;
+    }
+
+    .sim-poll-title {
+      font-weight: 600;
+      font-size: 0.92rem;
+      line-height: 1.4;
+    }
+
+    .sim-poll-type {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .sim-poll-option {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.7rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: var(--transition);
+    }
+
+    .sim-poll-option:hover {
+      background: rgba(var(--primary-rgb), 0.08);
+      border-color: rgba(var(--primary-rgb), 0.4);
+    }
+
+    .sim-poll-option.correct {
+      background: rgba(16, 185, 129, 0.12);
+      border-color: var(--secondary);
+      color: var(--secondary);
+      font-weight: 500;
+    }
+
+    .sim-poll-option.wrong {
+      background: rgba(239, 68, 68, 0.12);
+      border-color: #ef4444;
+      color: #f87171;
+    }
+
+    .sim-poll-badge {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 1px solid var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+    }
+
+    .sim-poll-option.correct .sim-poll-badge {
+      border-color: var(--secondary);
+      background: var(--secondary);
+      color: white;
+    }
+
+    .sim-poll-option.wrong .sim-poll-badge {
+      border-color: #ef4444;
+      background: #ef4444;
+      color: white;
+    }
+
+    .sim-poll-explanation {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      border-left: 2px solid var(--secondary);
+      padding-left: 0.8rem;
+      margin-top: 0.5rem;
+      line-height: 1.4;
+      animation: fadeIn 0.4s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(5px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .chat-input-bar {
+      margin-top: 1.2rem;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      padding: 0.5rem 0.8rem;
+    }
+
+    .chat-input-bar input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 0.9rem;
+      padding: 0.3rem;
+    }
+
+    .chat-input-bar button {
+      background: var(--primary);
+      border: none;
+      color: white;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: var(--transition);
+    }
+
+    .chat-input-bar button:hover {
+      transform: scale(1.05);
+    }
+
+    /* Simulation Control Buttons */
+    .sim-controls {
+      display: flex;
+      justify-content: center;
+      gap: 0.8rem;
+      margin-top: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-sim {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+
+    .btn-sim:hover, .btn-sim.active {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: rgba(var(--primary-rgb), 0.05);
+    }
+
+    /* Features Section */
+    .features {
+      padding: 6rem 0;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .section-title {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-title h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .section-title p {
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      padding: 2.2rem;
+      transition: var(--transition);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(var(--primary-rgb), 0.3);
+      box-shadow: 0 10px 30px rgba(var(--primary-rgb), 0.1);
+    }
+
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 12px;
+      background: rgba(var(--primary-rgb), 0.1);
+      border: 1px solid rgba(var(--primary-rgb), 0.2);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .feature-card:nth-child(even) .feature-icon {
+      background: rgba(var(--secondary-rgb), 0.1);
+      border: 1px solid rgba(var(--secondary-rgb), 0.2);
+      color: var(--secondary);
+    }
+
+    .feature-card h3 {
+      font-size: 1.2rem;
+      font-weight: 600;
+      margin-bottom: 0.8rem;
+    }
+
+    .feature-card p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Modal Styling */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(3, 7, 18, 0.8);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: #0d121f;
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      width: 95%;
+      max-width: 450px;
+      padding: 2.5rem;
+      position: relative;
+      box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+      transform: scale(0.9);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .modal-overlay.active .modal-card {
+      transform: scale(1);
+    }
+
+    .btn-close {
+      position: absolute;
+      top: 1.5rem;
+      right: 1.5rem;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      transition: var(--transition);
+    }
+
+    .btn-close:hover {
+      color: var(--text-main);
+    }
+
+    .modal-card h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+
+    .modal-card p {
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 0.95rem;
+    }
+
+    .mock-form {
+      display: flex;
+      flex-direction: column;
+      gap: 1.2rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .form-group label {
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
+    }
+
+    .form-group input {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      padding: 0.8rem 1rem;
+      border-radius: 10px;
+      color: var(--text-main);
+      outline: none;
+      font-size: 0.95rem;
+      transition: var(--transition);
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 10px rgba(var(--primary-rgb), 0.15);
+    }
+
+    .btn-submit {
+      background: linear-gradient(135deg, var(--primary) 0%, #1d4ed8 100%);
+      color: white;
+      border: none;
+      padding: 0.8rem;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition);
+      text-align: center;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(var(--primary-rgb), 0.3);
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 3rem 0;
+      background: rgba(8, 12, 20, 0.5);
+    }
+
+    .footer-wrapper {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .footer-wrapper p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 1.5rem;
+      list-style: none;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.9rem;
+      transition: var(--transition);
+    }
+
+    .footer-links a:hover {
+      color: var(--text-main);
+    }
+
+    /* Responsive Grid styling */
+    @media (max-width: 900px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+        text-align: center;
+      }
+      .hero-content p {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .cta-group {
+        justify-content: center;
+      }
+      .chat-area {
+        height: 310px;
+      }
+    }
+  </style>
+</head>
+<body>
+  
+  <div class="bg-glows">
+    <div class="glow-blob glow-1"></div>
+    <div class="glow-blob glow-2"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="container nav-wrapper">
+      <a href="#" class="logo">
+        <span class="logo-icon">🧠</span> Quiz Trivia Bot
+      </a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="https://github.com/Ashish0898/daily-telegram-quiz" target="_blank">GitHub</a></li>
+          <li>
+            <button onclick="openAdminModal()" class="btn-portal">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+              Admin Portal
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-content">
+        <h1>Tech & Logic Quizzes,<br><span class="gradient-text">Directly in Telegram</span></h1>
+        <p>Keep your Telegram developers and logic enthusiasts engaged. Delivers daily technical trivia using native Telegram poll cards, powered by GPT-4.1-Nano and verified by a comprehensive audit database.</p>
+        
+        <div class="cta-group">
+          <a href="https://t.me/ByteSizeBrainBot" target="_blank" class="btn btn-primary">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69.01-.03.01-.14-.07-.2-.08-.06-.19-.04-.27-.02-.11.02-1.93 1.23-5.46 3.62-.51.35-.98.53-1.39.51-.46-.01-1.33-.26-1.98-.47-.8-.26-1.43-.4-1.37-.85.03-.23.35-.47.96-.71 3.76-1.64 6.27-2.72 7.53-3.25 3.58-1.51 4.32-1.77 4.81-1.78.11 0 .35.03.5.16.13.1.17.24.18.34z"/></svg>
+            Add to Telegram
+          </a>
+          <button onclick="openAdminModal()" class="btn btn-secondary">
+            Admin Dashboard
+          </button>
+        </div>
+      </div>
+
+      <div class="mockup-wrapper">
+        <div class="device-mockup">
+          <div class="bot-header">
+            <div class="bot-avatar">🤖</div>
+            <div class="bot-status">
+              <h3>ByteSize Brain Bot</h3>
+              <span>online</span>
+            </div>
+          </div>
+          
+          <div class="chat-area" id="chat-box">
+            <!-- Simulated initial message -->
+            <div class="chat-msg msg-bot">
+              🧠 <b>Daily Trivia Quiz Bot</b> 🤖<br><br>
+              I generate and send interactive multiple-choice quiz polls!<br><br>
+              <b>Available Commands:</b><br>
+              • <code>/quiz</code> — Generate and send a new interactive quiz right now.<br>
+              • <code>/help</code> — Show this help message.
+            </div>
+          </div>
+
+          <div class="chat-input-bar">
+            <input type="text" id="chat-input" placeholder="Select a command below to test..." readonly>
+            <button id="send-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="sim-controls">
+          <button class="btn-sim" onclick="runSim('/quiz')">/quiz</button>
+          <button class="btn-sim" onclick="runSim('/users')">/users</button>
+          <button class="btn-sim" onclick="runSim('/help')">/help</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-title">
+        <h2>Built with Modern Tools</h2>
+        <p>A serverless infrastructure designed for high execution speed, minimal API footprint, and optimal performance.</p>
+      </div>
+
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🧠</div>
+          <h3>GPT-4 Quiz Engine</h3>
+          <p>Generates high-quality technical questions on software engineering, networking, and algorithms using the GitHub Models API.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📊</div>
+          <h3>Native Quiz Polls</h3>
+          <p>Delivers quizzes as native Telegram poll cards. Correct option reveals, explanations, and scores are managed directly by Telegram.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🛡️</div>
+          <h3>Access Control List</h3>
+          <p>Enforces a robust Supabase database allowlist to restrict user actions, allowing only authorized personnel to trigger bot administrative commands.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">⚡</div>
+          <h3>Vercel Serverless & Crons</h3>
+          <p>Deploys as lightweight serverless functions with Vercel Cron Integration, publishing daily quizzes at exactly 8:00 AM without runtime idle costs.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Admin Verification Modal -->
+  <div class="modal-overlay" id="admin-modal">
+    <div class="modal-card">
+      <button class="btn-close" onclick="closeAdminModal()">×</button>
+      <h2>Admin Authentication</h2>
+      <p>Please enter your Telegram Admin User ID to access the Allowed Users list and dashboard control panel.</p>
+      
+      <form class="mock-form" onsubmit="handleAdminSubmit(event)">
+        <div class="form-group">
+          <label for="admin-id-input">Telegram User ID</label>
+          <input type="text" id="admin-id-input" placeholder="e.g. 123456789" required autocomplete="off">
+        </div>
+        <button type="submit" class="btn-submit">Verify & Access Portal</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container footer-wrapper">
+      <p>&copy; 2026 Quiz Trivia Bot. All rights reserved.</p>
+      <ul class="footer-links">
+        <li><a href="#features">Features</a></li>
+        <li><a href="https://vercel.com" target="_blank">Vercel</a></li>
+        <li><a href="https://supabase.com" target="_blank">Supabase</a></li>
+      </ul>
+    </div>
+  </footer>
+
+  <!-- Script for Interactive Simulation & Modal -->
+  <script>
+    const chatBox = document.getElementById('chat-box');
+    const chatInput = document.getElementById('chat-input');
+    const adminModal = document.getElementById('admin-modal');
+
+    // Admin Modal handlers
+    function openAdminModal() {
+      adminModal.classList.add('active');
+      document.getElementById('admin-id-input').focus();
+    }
+
+    function closeAdminModal() {
+      adminModal.classList.remove('active');
+    }
+
+    function handleAdminSubmit(e) {
+      e.preventDefault();
+      const adminId = document.getElementById('admin-id-input').value.trim();
+      if (adminId && !isNaN(adminId)) {
+        window.location.href = `/api/users?admin_id=${adminId}`;
+      } else {
+        alert("Please enter a valid numeric Telegram Admin ID.");
+      }
+    }
+
+    // Chat Simulator State
+    let answeringActive = false;
+
+    function runSim(command) {
+      if (answeringActive) return; // Prevent overlapping interactions
+
+      // Deactivate all buttons
+      document.querySelectorAll('.btn-sim').forEach(btn => btn.classList.remove('active'));
+      
+      // Find matching button to highlight
+      const clickedBtn = Array.from(document.querySelectorAll('.btn-sim')).find(btn => btn.textContent === command);
+      if (clickedBtn) clickedBtn.classList.add('active');
+
+      // Populate input bar
+      chatInput.value = command;
+
+      // Add user message
+      const userMsgDiv = document.createElement('div');
+      userMsgDiv.className = 'chat-msg msg-user';
+      userMsgDiv.textContent = command;
+      chatBox.appendChild(userMsgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      // Simulate bot typing
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'chat-msg msg-bot';
+      loadingDiv.innerHTML = '<i>Typing...</i>';
+      
+      setTimeout(() => {
+        chatBox.appendChild(loadingDiv);
+        chatBox.scrollTop = chatBox.scrollHeight;
+      }, 400);
+
+      setTimeout(() => {
+        loadingDiv.remove();
+        if (command === '/quiz') {
+          renderQuizPoll();
+        } else if (command === '/users') {
+          renderUsersList();
+        } else if (command === '/help') {
+          renderHelp();
+        } else {
+          renderError();
+        }
+      }, 1300);
+    }
+
+    function renderHelp() {
+      const helpDiv = document.createElement('div');
+      helpDiv.className = 'chat-msg msg-bot';
+      helpDiv.innerHTML = `🧠 <b>Daily Trivia Quiz Bot</b> 🤖<br><br>
+        I generate and send interactive multiple-choice quiz polls!<br><br>
+        <b>Available Commands:</b><br>
+        • <code>/quiz</code> — Generate and send a new interactive quiz right now.<br>
+        • <code>/help</code> — Show this help message.<br><br>
+        🛡️ <b>Admin Commands:</b><br>
+        • <code>/allow &lt;username_or_id&gt; [role]</code> — Grant user access.<br>
+        • <code>/revoke &lt;username_or_id&gt;</code> — Revoke user access.<br>
+        • <code>/users</code> — List all registered users.`;
+      chatBox.appendChild(helpDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function renderUsersList() {
+      const usersDiv = document.createElement('div');
+      usersDiv.className = 'chat-msg msg-bot';
+      usersDiv.innerHTML = `👥 <b>Allowed Users List:</b><br><br>
+        ✅ <code>123456789</code> — @admin_user (🛡️ admin)<br>
+        ✅ <code>987654321</code> — @regular_member (👤 regular)<br>
+        ❌ <code>111222333</code> — @inactive_member (👤 regular)`;
+      chatBox.appendChild(usersDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function renderError() {
+      const errDiv = document.createElement('div');
+      errDiv.className = 'chat-msg msg-bot';
+      errDiv.innerHTML = `❓ <b>Unknown command.</b> Use /help to see the list of available commands.`;
+      chatBox.appendChild(errDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function renderQuizPoll() {
+      const pollContainer = document.createElement('div');
+      pollContainer.className = 'sim-poll';
+      
+      pollContainer.innerHTML = `
+        <div class="sim-poll-type">📊 Quiz Poll</div>
+        <div class="sim-poll-title">In Python 3.9+, what is the correct and most idiomatic way to merge two dictionaries?</div>
+        <div class="sim-poll-option" onclick="submitVote(this, false, 'dict1.update(dict2)')">
+          <span>dict1.update(dict2)</span>
+          <span class="sim-poll-badge">A</span>
+        </div>
+        <div class="sim-poll-option" onclick="submitVote(this, true, 'dict1 | dict2')">
+          <span>dict1 | dict2</span>
+          <span class="sim-poll-badge">B</span>
+        </div>
+        <div class="sim-poll-option" onclick="submitVote(this, false, '{**dict1, **dict2}')">
+          <span>{**dict1, **dict2}</span>
+          <span class="sim-poll-badge">C</span>
+        </div>
+        <div class="sim-poll-option" onclick="submitVote(this, false, 'merge(dict1, dict2)')">
+          <span>merge(dict1, dict2)</span>
+          <span class="sim-poll-badge">D</span>
+        </div>
+      `;
+      chatBox.appendChild(pollContainer);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    function submitVote(element, isCorrect, value) {
+      const parent = element.parentElement;
+      
+      // Disable further clicks on this poll
+      const options = parent.querySelectorAll('.sim-poll-option');
+      options.forEach(opt => {
+        opt.style.pointerEvents = 'none';
+        if (opt === element) {
+          opt.classList.add(isCorrect ? 'correct' : 'wrong');
+        } else if (opt.innerText.includes('dict1 | dict2')) {
+          // Highlight correct one if wrong was selected
+          opt.classList.add('correct');
+        }
+      });
+
+      // Render explanation
+      const explanation = document.createElement('div');
+      explanation.className = 'sim-poll-explanation';
+      explanation.innerHTML = `<b>Correct Answer: B (dict1 | dict2)</b><br><br>
+        Python 3.9 introduced the union operator (<code>|</code>) for dicts, allowing dict merging in a clean, out-of-place expression. <code>update()</code> performs the operation in-place, and <code>{**d1, **d2}</code> was the pre-3.9 method.`;
+      
+      parent.appendChild(explanation);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+  </script>
+</body>
+</html>

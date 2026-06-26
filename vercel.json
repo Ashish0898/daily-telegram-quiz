@@ -1,0 +1,13 @@
+{
+  "rewrites": [
+    { "source": "/api/telegram", "destination": "/api/index.py" },
+    { "source": "/api/quiz", "destination": "/api/index.py" },
+    { "source": "/api/users", "destination": "/api/index.py" }
+  ],
+  "crons": [
+    {
+      "path": "/api/quiz",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

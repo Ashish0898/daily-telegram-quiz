@@ -1,0 +1,253 @@
+import os
+import logging
+from supabase import create_client, Client
+from src.config import SUPABASE_URL, SUPABASE_KEY, ADMIN_USER_IDS
+from src.utils import log_step
+
+logger = logging.getLogger("db")
+
+_client = None
+
+def get_supabase_client() -> Client:
+    """Initialize and return the Supabase client."""
+    global _client
+    if _client is not None:
+        return _client
+
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        logger.warning("Supabase credentials not configured. Skipping database operations.")
+        return None
+
+    try:
+        _client = create_client(SUPABASE_URL, SUPABASE_KEY)
+        return _client
+    except Exception as e:
+        logger.error(f"Failed to initialize Supabase client: {e}")
+        return None
+
+def log_request(
+    endpoint: str,
+    status: str,
+    user_id: int = None,
+    username: str = None,
+    chat_id: int = None,
+    command: str = None,
+    error_message: str = None,
+    execution_time_ms: int = None,
+    response_content: str = None,
+    topic: str = None
+) -> None:
+    """Log execution audits to Supabase 'request_audit' table."""
+    client = get_supabase_client()
+    if not client:
+        return
+
+    payload = {
+        "endpoint": endpoint,
+        "status": status,
+        "user_id": user_id,
+        "username": username,
+        "chat_id": chat_id,
+        "command": command,
+        "error_message": error_message,
+        "execution_time_ms": execution_time_ms,
+        "response_content": response_content,
+        "topic": topic
+    }
+
+    try:
+        client.table("request_audit").insert(payload).execute()
+        logger.info(f"Audited request to Supabase for endpoint: {endpoint}")
+    except Exception as e:
+        logger.error(f"Failed to insert audit log: {e}")
+
+@log_step(logger)
+def save_quiz_to_history(
+    question: str,
+    options: list[str],
+    correct_option_id: int,
+    explanation: str = None,
+    category: str = None,
+    poll_id: str = None
+) -> None:
+    """Log a sent quiz to the 'quiz_history' table in Supabase."""
+    client = get_supabase_client()
+    if not client:
+        return
+
+    payload = {
+        "question": question,
+        "options": options,
+        "correct_option_id": correct_option_id,
+        "explanation": explanation,
+        "category": category,
+        "poll_id": poll_id
+    }
+
+    try:
+        client.table("quiz_history").insert(payload).execute()
+        logger.info("Saved quiz item to Supabase quiz_history.")
+    except Exception as e:
+        logger.error(f"Failed to save quiz to history: {e}")
+        raise
+
+@log_step(logger)
+def is_user_allowed(user_id: int) -> bool:
+    """Check if a Telegram user ID is present and active in Supabase allowed_users."""
+    if user_id in ADMIN_USER_IDS:
+        logger.info(f"User {user_id} is in config ADMIN_USER_IDS. Access allowed.")
+        return True
+
+    client = get_supabase_client()
+    if not client:
+        # Fallback: if database is not set, allow admin IDs in config
+        return len(ADMIN_USER_IDS) == 0 or user_id in ADMIN_USER_IDS
+
+    try:
+        response = client.table("allowed_users").select("is_active").eq("user_id", user_id).execute()
+        if response.data and len(response.data) > 0:
+            active = response.data[0].get("is_active", True)
+            logger.info(f"DB allowlist lookup result for {user_id}: active={active}")
+            return active
+        logger.info(f"User {user_id} not found in DB allowlist.")
+        return False
+    except Exception as e:
+        logger.warning(f"Could not query 'allowed_users' in Supabase: {e}. Falling back to admin config check.")
+        return user_id in ADMIN_USER_IDS
+
+@log_step(logger)
+def is_user_admin(user_id: int) -> bool:
+    """Check if a Telegram user ID is an admin."""
+    if user_id in ADMIN_USER_IDS:
+        return True
+
+    client = get_supabase_client()
+    if not client:
+        return user_id in ADMIN_USER_IDS
+
+    try:
+        response = client.table("allowed_users").select("role").eq("user_id", user_id).execute()
+        if response.data and len(response.data) > 0:
+            role = response.data[0].get("role")
+            return role == "admin"
+        return False
+    except Exception as e:
+        logger.error(f"Failed to check admin status: {e}")
+        return False
+
+@log_step(logger)
+def allow_user(user_id: int, username: str = None, role: str = "regular") -> tuple[bool, str | None]:
+    """Upsert an allowed user in Supabase allowed_users."""
+    client = get_supabase_client()
+    if not client:
+        return False, "Database connection not available"
+
+    payload = {
+        "user_id": user_id,
+        "role": role,
+        "is_active": True
+    }
+    if username:
+        payload["username"] = username.lstrip('@')
+
+    try:
+        client.table("allowed_users").upsert(payload).execute()
+        return True, None
+    except Exception as e:
+        logger.exception(f"Failed to allow user {user_id}")
+        return False, str(e)
+
+@log_step(logger)
+def revoke_user(user_id: int) -> tuple[bool, str | None]:
+    """Deactivate a user in the 'allowed_users' table."""
+    client = get_supabase_client()
+    if not client:
+        return False, "Database connection not available"
+
+    try:
+        client.table("allowed_users").update({"is_active": False}).eq("user_id", user_id).execute()
+        return True, None
+    except Exception as e:
+        logger.exception(f"Failed to revoke user {user_id}")
+        return False, str(e)
+
+@log_step(logger)
+def register_inactive_user_if_new(user_id: int, username: str = None) -> bool:
+    """Register a new user in database as inactive, awaiting authorization."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        response = client.table("allowed_users").select("user_id").eq("user_id", user_id).execute()
+        if response.data and len(response.data) > 0:
+            return False
+
+        payload = {
+            "user_id": user_id,
+            "is_active": False,
+            "role": "regular"
+        }
+        if username:
+            payload["username"] = username.lstrip('@')
+
+        client.table("allowed_users").insert(payload).execute()
+        logger.info(f"Registered new inactive user: {user_id} (username: {username})")
+        return True
+    except Exception as e:
+        logger.exception(f"Failed to register inactive user {user_id}")
+        return False
+
+@log_step(logger)
+def resolve_user_details(identifier: str) -> tuple[int | None, str | None]:
+    """Resolve identifier (numeric ID or username) to (user_id, username)."""
+    if not identifier:
+        return None, None
+
+    identifier = identifier.strip()
+    client = get_supabase_client()
+    if not client:
+        # Without DB, can only resolve numeric strings
+        if identifier.isdigit():
+            return int(identifier), None
+        return None, None
+
+    if identifier.isdigit():
+        user_id = int(identifier)
+        try:
+            response = client.table("allowed_users").select("username").eq("user_id", user_id).execute()
+            if response.data and len(response.data) > 0:
+                return user_id, response.data[0].get("username")
+        except Exception:
+            pass
+        return user_id, None
+
+    username = identifier.lstrip('@')
+    try:
+        response = client.table("allowed_users").select("user_id, username").eq("username", username).execute()
+        if response.data and len(response.data) > 0:
+            row = response.data[0]
+            return row.get("user_id"), row.get("username")
+
+        response = client.table("allowed_users").select("user_id, username").ilike("username", username).execute()
+        if response.data and len(response.data) > 0:
+            row = response.data[0]
+            return row.get("user_id"), row.get("username")
+    except Exception as e:
+        logger.error(f"Failed to resolve username {username}: {e}")
+
+    return None, None
+
+@log_step(logger)
+def get_all_users() -> list[dict]:
+    """Retrieve all users on the allowlist."""
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        response = client.table("allowed_users").select("*").execute()
+        return response.data or []
+    except Exception as e:
+        logger.error(f"Failed to retrieve allowed users: {e}")
+        return []
