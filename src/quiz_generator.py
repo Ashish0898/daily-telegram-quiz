@@ -28,8 +28,8 @@ THEME_SCHEDULE = {
         "seed": "caching strategies (LRU/LFU), load balancing, DNS, TCP vs UDP, CDN, microservices, rate limiting, message queues, event-driven design"
     },
     4: {
-        "category": "Programming Languages & Runtimes",
-        "seed": "garbage collection mechanisms, memory management (stack vs heap), concurrency vs parallelism, JavaScript event loop, Python GIL, Go channels"
+        "category": "Python Programming",
+        "seed": "Python internals, data model, iterator protocol, async/await, decorators, context managers, Python GIL, memory model"
     },
     5: {
         "category": "DevOps, Git & Linux",
