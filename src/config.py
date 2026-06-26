@@ -24,3 +24,6 @@ for uid in raw_admins.split(","):
     uid = uid.strip()
     if uid.isdigit():
         ADMIN_USER_IDS.append(int(uid))
+
+# Quiz Format Configuration: 'poll' (native) or 'inline' (message + buttons)
+QUIZ_FORMAT = os.getenv("QUIZ_FORMAT", "poll").strip().lower()

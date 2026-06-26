@@ -6,8 +6,8 @@ from utils import log_step
 logger = logging.getLogger("telegram_client")
 
 @log_step(logger)
-def send_message(chat_id: int, text: str, parse_mode: str = "HTML", disable_preview: bool = True) -> dict:
-    """Send a text message to Telegram."""
+def send_message(chat_id: int, text: str, parse_mode: str = "HTML", disable_preview: bool = True, reply_markup: dict = None) -> dict:
+    """Send a text message to Telegram, optionally with an inline keyboard markup."""
     if not TELEGRAM_BOT_TOKEN:
         raise ValueError("TELEGRAM_BOT_TOKEN is not set")
 
@@ -18,6 +18,8 @@ def send_message(chat_id: int, text: str, parse_mode: str = "HTML", disable_prev
         "parse_mode": parse_mode,
         "disable_web_page_preview": disable_preview
     }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
 
     try:
         logger.info(f"Posting text message to chat {chat_id}")
@@ -87,6 +89,25 @@ def send_chat_action(chat_id: int, action: str = "typing") -> None:
         requests.post(url, json=payload, timeout=5)
     except Exception as e:
         logger.warning(f"Failed to send chat action {action} to {chat_id}: {e}")
+
+@log_step(logger)
+def answer_callback_query(callback_query_id: str, text: str, show_alert: bool = False) -> bool:
+    """Acknowledge a callback query and show a notification or alert to the user."""
+    if not TELEGRAM_BOT_TOKEN:
+        return False
+    url = f"{TELEGRAM_API}/answerCallbackQuery"
+    payload = {
+        "callback_query_id": callback_query_id,
+        "text": text,
+        "show_alert": show_alert
+    }
+    try:
+        response = requests.post(url, json=payload, timeout=5)
+        response.raise_for_status()
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to answer callback query {callback_query_id}: {e}")
+        return False
 
 if __name__ == "__main__":
     # Example usage

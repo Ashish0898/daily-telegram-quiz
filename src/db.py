@@ -69,11 +69,11 @@ def save_quiz_to_history(
     explanation: str = None,
     category: str = None,
     poll_id: str = None
-) -> None:
-    """Log a sent quiz to the 'quiz_history' table in Supabase."""
+) -> int | None:
+    """Log a sent quiz to the 'quiz_history' table in Supabase and return the row ID."""
     client = get_supabase_client()
     if not client:
-        return
+        return None
 
     payload = {
         "question": question,
@@ -85,8 +85,11 @@ def save_quiz_to_history(
     }
 
     try:
-        client.table("quiz_history").insert(payload).execute()
+        response = client.table("quiz_history").insert(payload).execute()
         logger.info("Saved quiz item to Supabase quiz_history.")
+        if response.data and len(response.data) > 0:
+            return response.data[0].get("id")
+        return None
     except Exception as e:
         logger.error(f"Failed to save quiz to history: {e}")
         raise
@@ -251,3 +254,80 @@ def get_all_users() -> list[dict]:
     except Exception as e:
         logger.error(f"Failed to retrieve allowed users: {e}")
         return []
+
+@log_step(logger)
+def save_user_answer(poll_id: str, user_id: int, username: str, selected_option_id: int) -> bool:
+    """Save a user's quiz poll answer to Supabase."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    payload = {
+        "poll_id": poll_id,
+        "user_id": user_id,
+        "selected_option_id": selected_option_id
+    }
+    if username:
+        payload["username"] = username.lstrip('@')
+
+    try:
+        client.table("user_quiz_answers").upsert(payload, on_conflict="poll_id,user_id").execute()
+        logger.info(f"Successfully saved answer in DB for user {user_id} on poll {poll_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save user answer to DB: {e}")
+        return False
+
+@log_step(logger)
+def save_user_inline_answer(quiz_id: int, user_id: int, username: str, selected_option_id: int, is_correct: bool) -> bool:
+    """Save a user's inline keyboard quiz answer to Supabase."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    payload = {
+        "quiz_id": quiz_id,
+        "user_id": user_id,
+        "selected_option_id": selected_option_id,
+        "is_correct": is_correct
+    }
+    if username:
+        payload["username"] = username.lstrip('@')
+
+    try:
+        client.table("user_quiz_answers").upsert(payload, on_conflict="quiz_id,user_id").execute()
+        logger.info(f"Successfully saved inline answer in DB for user {user_id} on quiz {quiz_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save user inline answer to DB: {e}")
+        return False
+
+@log_step(logger)
+def get_quiz_explanation(quiz_id: int) -> str | None:
+    """Retrieve explanation for a quiz from history by its ID."""
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        response = client.table("quiz_history").select("explanation").eq("id", quiz_id).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0].get("explanation")
+        return None
+    except Exception as e:
+        logger.error(f"Failed to fetch explanation for quiz {quiz_id}: {e}")
+        return None
+
+@log_step(logger)
+def has_user_answered(quiz_id: int, user_id: int) -> bool:
+    """Check if a user has already answered a specific quiz."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        response = client.table("user_quiz_answers").select("id").eq("quiz_id", quiz_id).eq("user_id", user_id).execute()
+        return len(response.data) > 0
+    except Exception as e:
+        logger.error(f"Failed to check if user answered quiz {quiz_id}: {e}")
+        return False

@@ -35,8 +35,8 @@ if os.path.exists(env_path):
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from src.config import TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET
-from src.telegram_client import send_message, send_poll, send_chat_action
+from src.config import TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET, QUIZ_FORMAT
+from src.telegram_client import send_message, send_poll, send_chat_action, answer_callback_query
 from src.quiz_generator import generate_quiz
 from src.db import (
     log_request,
@@ -221,6 +221,86 @@ class handler(BaseHTTPRequestHandler):
             )
             return
 
+        # Handle Poll Answer updates (User votes in non-anonymous polls)
+        if "poll_answer" in body:
+            poll_answer = body["poll_answer"]
+            poll_id = poll_answer.get("poll_id")
+            user = poll_answer.get("user", {})
+            user_id = user.get("id")
+            username = user.get("username")
+            option_ids = poll_answer.get("option_ids", [])
+            
+            if option_ids and user_id is not None:
+                selected_option = option_ids[0]
+                logger.info(f"Received poll answer: user_id={user_id}, username={username}, poll_id={poll_id}, option_id={selected_option}")
+                from src.db import save_user_answer
+                save_user_answer(poll_id, user_id, username, selected_option)
+                
+            self.send_json(200, {"ok": True})
+            log_request(
+                endpoint="webhook",
+                status="poll_answer",
+                user_id=user_id,
+                username=username,
+                command="poll_answer_received",
+                execution_time_ms=int((time.time() - start_time) * 1000)
+            )
+            return
+
+        # Handle Callback Query updates (User clicks inline keyboard buttons)
+        if "callback_query" in body:
+            callback_query = body["callback_query"]
+            cb_id = callback_query.get("id")
+            user = callback_query.get("from", {})
+            user_id = user.get("id")
+            username = user.get("username")
+            data = callback_query.get("data", "")
+            
+            if data.startswith("qa:"):
+                parts = data.split(":")
+                if len(parts) == 4:
+                    selected = int(parts[1])
+                    correct = int(parts[2])
+                    quiz_id = int(parts[3])
+                    
+                    # Check if user already answered this quiz
+                    from src.db import has_user_answered
+                    if has_user_answered(quiz_id, user_id):
+                        answer_callback_query(cb_id, "⚠️ You have already answered this quiz! Only your first attempt is registered.", show_alert=True)
+                        self.send_json(200, {"ok": True})
+                        return
+                    
+                    is_correct = (selected == correct)
+                    
+                    # Save inline answer to database
+                    from src.db import save_user_inline_answer
+                    save_user_inline_answer(quiz_id, user_id, username, selected, is_correct)
+                    
+                    # Look up the explanation from quiz history if available
+                    from src.db import get_quiz_explanation
+                    explanation = get_quiz_explanation(quiz_id)
+                    
+                    emoji = "✅ Correct!" if is_correct else "❌ Incorrect!"
+                    alert_text = f"{emoji}\n\n"
+                    if explanation:
+                        alert_text += explanation
+                    else:
+                        alert_text += f"The correct answer was option {chr(65 + correct)}."
+                        
+                    # Send flash alert popup to user
+                    answer_callback_query(cb_id, alert_text, show_alert=True)
+                    
+            self.send_json(200, {"ok": True})
+            log_request(
+                endpoint="webhook",
+                status="callback_query",
+                user_id=user_id,
+                username=username,
+                command="callback_query_received",
+                execution_time_ms=int((time.time() - start_time) * 1000)
+            )
+            return
+
         message = body.get("message") or body.get("edited_message")
         if not message or "text" not in message:
             logger.info("Ignoring webhook payload: no message body or no text content found.")
@@ -285,28 +365,65 @@ class handler(BaseHTTPRequestHandler):
                 send_chat_action(chat_id, "upload_document") # "upload_document" / typing
                 quiz_data = generate_quiz()
                 
-                # Send Quiz Poll
-                poll_resp = send_poll(
-                    chat_id=chat_id,
-                    question=quiz_data["question"],
-                    options=quiz_data["options"],
-                    correct_option_id=quiz_data["correct_option_id"],
-                    explanation=quiz_data["explanation"],
-                    is_anonymous=False # Not anonymous, lets them see who voted
-                )
+                if QUIZ_FORMAT == "inline":
+                    # Save quiz to history first to get the database row ID
+                    quiz_id = save_quiz_to_history(
+                        question=quiz_data["question"],
+                        options=quiz_data["options"],
+                        correct_option_id=quiz_data["correct_option_id"],
+                        explanation=quiz_data["explanation"],
+                        category=quiz_data["category"],
+                        poll_id=None
+                    )
+                    
+                    text = (
+                        f"🧠 <b>Daily Technical Trivia</b>\n"
+                        f"Category: <code>{quiz_data['category']}</code>\n\n"
+                        f"<b>{quiz_data['question']}</b>\n\n"
+                        f"🇦 {quiz_data['options'][0]}\n"
+                        f"🇧 {quiz_data['options'][1]}\n"
+                    )
+                    if len(quiz_data['options']) > 2:
+                        text += f"🇨 {quiz_data['options'][2]}\n"
+                    if len(quiz_data['options']) > 3:
+                        text += f"🇩 {quiz_data['options'][3]}\n"
+                    text += "\n<i>Tap a button below to submit your answer:</i>"
+
+                    # Generate inline keyboard A, B, C, D
+                    reply_markup = {
+                        "inline_keyboard": [
+                            [
+                                {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
+                            ]
+                        ]
+                    }
+                    send_message(chat_id, text, reply_markup=reply_markup)
+                else:
+                    # Send Quiz Poll
+                    poll_resp = send_poll(
+                        chat_id=chat_id,
+                        question=quiz_data["question"],
+                        options=quiz_data["options"],
+                        correct_option_id=quiz_data["correct_option_id"],
+                        explanation=quiz_data["explanation"],
+                        is_anonymous=False # Not anonymous, lets them see who voted
+                    )
+                    
+                    # Save to database histories
+                    poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+                    save_quiz_to_history(
+                        question=quiz_data["question"],
+                        options=quiz_data["options"],
+                        correct_option_id=quiz_data["correct_option_id"],
+                        explanation=quiz_data["explanation"],
+                        category=quiz_data["category"],
+                        poll_id=poll_id
+                    )
                 
-                # Save to database histories
-                poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
-                save_quiz_to_history(
-                    question=quiz_data["question"],
-                    options=quiz_data["options"],
-                    correct_option_id=quiz_data["correct_option_id"],
-                    explanation=quiz_data["explanation"],
-                    category=quiz_data["category"],
-                    poll_id=poll_id
-                )
-                
-                response_text = f"Quiz Poll Sent: '{quiz_data['question']}'"
+                response_text = f"Quiz Sent: '{quiz_data['question']}'"
                 topic = quiz_data["category"]
 
             elif cmd_type == "allow":
@@ -432,34 +549,73 @@ class handler(BaseHTTPRequestHandler):
             sent_count = 0
             errors = []
             poll_id_to_save = None
+            quiz_id = None
+
+            # If format is inline, save to history first to get database ID
+            if QUIZ_FORMAT == "inline":
+                quiz_id = save_quiz_to_history(
+                    question=quiz_data["question"],
+                    options=quiz_data["options"],
+                    correct_option_id=quiz_data["correct_option_id"],
+                    explanation=quiz_data["explanation"],
+                    category=quiz_data["category"],
+                    poll_id=None
+                )
 
             for chat_id in target_ids:
                 try:
-                    poll_resp = send_poll(
-                        chat_id=chat_id,
-                        question=quiz_data["question"],
-                        options=quiz_data["options"],
-                        correct_option_id=quiz_data["correct_option_id"],
-                        explanation=quiz_data["explanation"],
-                        is_anonymous=True
-                    )
+                    if QUIZ_FORMAT == "inline":
+                        text = (
+                            f"🧠 <b>Daily Technical Trivia</b>\n"
+                            f"Category: <code>{quiz_data['category']}</code>\n\n"
+                            f"<b>{quiz_data['question']}</b>\n\n"
+                            f"🇦 {quiz_data['options'][0]}\n"
+                            f"🇧 {quiz_data['options'][1]}\n"
+                        )
+                        if len(quiz_data['options']) > 2:
+                            text += f"🇨 {quiz_data['options'][2]}\n"
+                        if len(quiz_data['options']) > 3:
+                            text += f"🇩 {quiz_data['options'][3]}\n"
+                        text += "\n<i>Tap a button below to submit your answer:</i>"
+
+                        reply_markup = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
+                                ]
+                            ]
+                        }
+                        send_message(chat_id, text, reply_markup=reply_markup)
+                    else:
+                        poll_resp = send_poll(
+                            chat_id=chat_id,
+                            question=quiz_data["question"],
+                            options=quiz_data["options"],
+                            correct_option_id=quiz_data["correct_option_id"],
+                            explanation=quiz_data["explanation"],
+                            is_anonymous=True
+                        )
+                        # Save the poll ID returned for history tracking
+                        if poll_resp and not poll_id_to_save:
+                            poll_id_to_save = poll_resp.get("result", {}).get("poll", {}).get("id")
                     sent_count += 1
-                    # Save the poll ID returned for history tracking
-                    if poll_resp and not poll_id_to_save:
-                        poll_id_to_save = poll_resp.get("result", {}).get("poll", {}).get("id")
                 except Exception as e:
-                    logger.error(f"Failed to send poll to chat {chat_id}: {e}")
+                    logger.error(f"Failed to send poll/message to chat {chat_id}: {e}")
                     errors.append(f"{chat_id}: {str(e)}")
 
-            # Save to database histories (use tracked poll ID if available)
-            save_quiz_to_history(
-                question=quiz_data["question"],
-                options=quiz_data["options"],
-                correct_option_id=quiz_data["correct_option_id"],
-                explanation=quiz_data["explanation"],
-                category=quiz_data["category"],
-                poll_id=poll_id_to_save
-            )
+            # If format was poll, save to history now
+            if QUIZ_FORMAT != "inline":
+                save_quiz_to_history(
+                    question=quiz_data["question"],
+                    options=quiz_data["options"],
+                    correct_option_id=quiz_data["correct_option_id"],
+                    explanation=quiz_data["explanation"],
+                    category=quiz_data["category"],
+                    poll_id=poll_id_to_save
+                )
 
             response_data = {
                 "ok": True,
