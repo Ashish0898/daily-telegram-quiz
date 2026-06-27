@@ -61,6 +61,9 @@ def parse_command(text: str) -> dict:
     if normalized.startswith("/quiz"):
         return {"type": "quiz", "query": None}
 
+    if normalized.startswith("/leaderboard") or normalized.startswith("/lb"):
+        return {"type": "leaderboard", "query": None}
+
     if normalized.startswith("/help") or normalized.startswith("/start"):
         return {"type": "help", "query": None}
 
@@ -84,6 +87,7 @@ def build_help_message(is_admin: bool = False) -> str:
         "I generate and send interactive multiple-choice quiz polls!\n\n"
         "<b>Available Commands:</b>\n"
         "• /quiz — Generate and send a new interactive quiz right now.\n"
+        "• /leaderboard — View current scores and standings.\n"
         "• /help — Show this help message."
     )
     if is_admin:
@@ -94,6 +98,57 @@ def build_help_message(is_admin: bool = False) -> str:
             "• /users — List all registered users."
         )
     return msg
+
+def build_leaderboard_message() -> str:
+    """Retrieve leaderboard data and format it beautifully as HTML for Telegram."""
+    from src.db import get_leaderboard_data, get_last_quiz_results
+    
+    # 1. Fetch last quiz champions
+    last_quiz = get_last_quiz_results()
+    champions_text = ""
+    if last_quiz:
+        correct = last_quiz.get("correct_players", [])
+        if correct:
+            champions_text = ", ".join(correct)
+        else:
+            champions_text = "No correct answers yet."
+    else:
+        champions_text = "No quizzes recorded."
+
+    # 2. Fetch weekly leaderboard (last 7 days)
+    weekly_lb = get_leaderboard_data(days=7)
+    weekly_text = ""
+    if weekly_lb:
+        medals = ["🥇", "🥈", "🥉"]
+        for idx, entry in enumerate(weekly_lb[:5]):
+            rank = medals[idx] if idx < 3 else f"{idx + 1}."
+            weekly_text += f"{rank} {entry['player']} — <b>{entry['correct']} pts</b> ({entry['accuracy']}% accuracy)\n"
+    else:
+        weekly_text = "No answers this week yet.\n"
+
+    # 3. Fetch all-time leaderboard
+    all_time_lb = get_leaderboard_data()
+    all_time_text = ""
+    if all_time_lb:
+        medals = ["🏆", "🥈", "🥉"]
+        for idx, entry in enumerate(all_time_lb[:5]):
+            rank = medals[idx] if idx < 3 else f"{idx + 1}."
+            all_time_text += f"{rank} {entry['player']} — <b>{entry['correct']} pts</b> (total: {entry['total']})\n"
+    else:
+        all_time_text = "No answers recorded yet.\n"
+
+    msg = (
+        "🏆 <b>QUIZ LEADERBOARD</b> 🏆\n\n"
+        "🎯 <b>Last Quiz Champions:</b>\n"
+        f"{champions_text}\n\n"
+        "🔥 <b>Top Players (This Week):</b>\n"
+        f"{weekly_text}\n"
+        "👑 <b>All-Time Hall of Fame:</b>\n"
+        f"{all_time_text}\n"
+        "<i>Compete daily to improve your rank!</i>"
+    )
+    return msg
+
 
 class handler(BaseHTTPRequestHandler):
     def send_json(self, status_code: int, data: dict):
@@ -425,6 +480,12 @@ class handler(BaseHTTPRequestHandler):
                 
                 response_text = f"Quiz Sent: '{quiz_data['question']}'"
                 topic = quiz_data["category"]
+
+            elif cmd_type == "leaderboard":
+                send_chat_action(chat_id, "typing")
+                response_text = build_leaderboard_message()
+                send_message(chat_id, response_text)
+                topic = "leaderboard"
 
             elif cmd_type == "allow":
                 if not is_admin:

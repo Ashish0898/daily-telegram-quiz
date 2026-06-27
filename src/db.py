@@ -344,3 +344,108 @@ def has_user_answered(quiz_id: int, user_id: int) -> bool:
     except Exception as e:
         logger.error(f"Failed to check if user answered quiz {quiz_id}: {e}")
         return False
+
+@log_step(logger)
+def get_leaderboard_data(days: int = None) -> list[dict]:
+    """Retrieve aggregated player leaderboard data, optionally filtered by days."""
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        query = client.table("user_quiz_answers").select("user_id, username, is_correct, created_at")
+        if days is not None:
+            from datetime import datetime, timedelta, timezone
+            cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+            query = query.gte("created_at", cutoff.isoformat())
+
+        response = query.execute()
+        rows = response.data or []
+
+        stats = {}
+        for r in rows:
+            user_id = r.get("user_id")
+            username = r.get("username")
+            is_correct = r.get("is_correct")
+
+            player = f"@{username}" if username else f"User {user_id}"
+            if not player:
+                continue
+
+            if player not in stats:
+                stats[player] = {"correct": 0, "total": 0}
+
+            stats[player]["total"] += 1
+            if is_correct:
+                stats[player]["correct"] += 1
+
+        leaderboard = []
+        for player, data in stats.items():
+            correct = data["correct"]
+            total = data["total"]
+            accuracy = round((correct / total) * 100, 1) if total > 0 else 0.0
+            leaderboard.append({
+                "player": player,
+                "correct": correct,
+                "total": total,
+                "accuracy": accuracy
+            })
+
+        # Sort by correct answers desc, then accuracy desc
+        leaderboard.sort(key=lambda x: (x["correct"], x["accuracy"]), reverse=True)
+        return leaderboard
+    except Exception as e:
+        logger.error(f"Failed to retrieve leaderboard data: {e}")
+        return []
+
+@log_step(logger)
+def get_last_quiz_results() -> dict | None:
+    """Retrieve details and voter breakdown for the most recently sent quiz."""
+    client = get_supabase_client()
+    if not client:
+        return None
+
+    try:
+        # Get the latest quiz from history
+        response = client.table("quiz_history").select("*").order("created_at", desc=True).limit(1).execute()
+        if not response.data or len(response.data) == 0:
+            return None
+
+        quiz = response.data[0]
+        quiz_id = quiz.get("id")
+        poll_id = quiz.get("poll_id")
+        question = quiz.get("question")
+
+        # Fetch answers for this quiz
+        query = client.table("user_quiz_answers").select("user_id, username, is_correct")
+        if poll_id:
+            query = query.eq("poll_id", poll_id)
+        else:
+            query = query.eq("quiz_id", quiz_id)
+
+        ans_response = query.execute()
+        answers = ans_response.data or []
+
+        correct_players = []
+        incorrect_players = []
+
+        for ans in answers:
+            username = ans.get("username")
+            user_id = ans.get("user_id")
+            player = f"@{username}" if username else f"User {user_id}"
+
+            if ans.get("is_correct"):
+                correct_players.append(player)
+            else:
+                incorrect_players.append(player)
+
+        return {
+            "question": question,
+            "correct_players": correct_players,
+            "incorrect_players": incorrect_players,
+            "total_answers": len(answers)
+        }
+    except Exception as e:
+        logger.error(f"Failed to retrieve last quiz results: {e}")
+        return None
+

@@ -59,7 +59,9 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
 
 ## Webhook Commands
 - `/quiz` — Generates a new quiz question on the fly and posts it to the chat.
+- `/leaderboard` (or `/lb`) — Displays the current player rankings, weekly standings, and accuracy scores.
 - `/help` — Displays a helpful interface with lists of bot commands.
+
 
 **Admin-Only Commands:**
 - `/allow <username_or_id> [role]` — Registers/activates a user to use the bot.
