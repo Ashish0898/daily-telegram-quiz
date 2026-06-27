@@ -208,14 +208,16 @@ def resolve_user_details(identifier: str) -> tuple[int | None, str | None]:
         return None, None
 
     identifier = identifier.strip()
+    is_numeric = identifier.isdigit() or (identifier.startswith('-') and identifier[1:].isdigit())
+
     client = get_supabase_client()
     if not client:
         # Without DB, can only resolve numeric strings
-        if identifier.isdigit():
+        if is_numeric:
             return int(identifier), None
         return None, None
 
-    if identifier.isdigit():
+    if is_numeric:
         user_id = int(identifier)
         try:
             response = client.table("allowed_users").select("username").eq("user_id", user_id).execute()
@@ -224,6 +226,7 @@ def resolve_user_details(identifier: str) -> tuple[int | None, str | None]:
         except Exception:
             pass
         return user_id, None
+
 
     username = identifier.lstrip('@')
     try:
@@ -262,25 +265,43 @@ def save_user_answer(poll_id: str, user_id: int, username: str, selected_option_
     if not client:
         return False
 
-    # Look up the correct answer from quiz history using poll_id
+    # Look up the correct answer using poll_id (via quiz_polls mapping or direct quiz_history lookup)
     is_correct = None
+    quiz_id = None
     try:
-        response = client.table("quiz_history").select("correct_option_id").eq("poll_id", poll_id).execute()
-        if response.data and len(response.data) > 0:
-            correct_option_id = response.data[0].get("correct_option_id")
-            if correct_option_id is not None:
-                is_correct = (selected_option_id == correct_option_id)
+        # 1. Try to find the quiz_id from quiz_polls mapping table first
+        polls_resp = client.table("quiz_polls").select("quiz_id").eq("poll_id", poll_id).execute()
+        if polls_resp.data and len(polls_resp.data) > 0:
+            quiz_id = polls_resp.data[0].get("quiz_id")
+
+        if quiz_id:
+            # 2. If quiz_id is found, retrieve correct option from history
+            hist_resp = client.table("quiz_history").select("correct_option_id").eq("id", quiz_id).execute()
+            if hist_resp.data and len(hist_resp.data) > 0:
+                correct_option_id = hist_resp.data[0].get("correct_option_id")
+                if correct_option_id is not None:
+                    is_correct = (selected_option_id == correct_option_id)
+        else:
+            # 3. Fallback: Search quiz_history directly (for older polls or single group chat polls)
+            hist_resp = client.table("quiz_history").select("correct_option_id", "id").eq("poll_id", poll_id).execute()
+            if hist_resp.data and len(hist_resp.data) > 0:
+                correct_option_id = hist_resp.data[0].get("correct_option_id")
+                quiz_id = hist_resp.data[0].get("id")
+                if correct_option_id is not None:
+                    is_correct = (selected_option_id == correct_option_id)
     except Exception as e:
-        logger.error(f"Failed to lookup correctness for poll {poll_id}: {e}")
+        logger.error(f"Failed to lookup correctness/quiz_id for poll {poll_id}: {e}")
 
     payload = {
         "poll_id": poll_id,
+        "quiz_id": quiz_id,
         "user_id": user_id,
         "selected_option_id": selected_option_id,
         "is_correct": is_correct
     }
     if username:
         payload["username"] = username.lstrip('@')
+
 
     try:
         client.table("user_quiz_answers").upsert(payload, on_conflict="poll_id,user_id").execute()
@@ -418,10 +439,28 @@ def get_last_quiz_results() -> dict | None:
 
         # Fetch answers for this quiz
         query = client.table("user_quiz_answers").select("user_id, username, is_correct")
+        
+        # Look up all poll IDs associated with this quiz_id in the quiz_polls mapping table
+        associated_poll_ids = []
+        try:
+            polls_resp = client.table("quiz_polls").select("poll_id").eq("quiz_id", quiz_id).execute()
+            if polls_resp.data:
+                associated_poll_ids = [p.get("poll_id") for p in polls_resp.data]
+        except Exception as e:
+            logger.error(f"Failed to fetch associated poll IDs for quiz {quiz_id}: {e}")
+
+        # Also add the main poll_id (group poll ID) if set in quiz_history
         if poll_id:
-            query = query.eq("poll_id", poll_id)
+            if "," in poll_id:
+                associated_poll_ids.extend([p.strip() for p in poll_id.split(",") if p.strip()])
+            else:
+                associated_poll_ids.append(poll_id)
+
+        if associated_poll_ids:
+            query = query.in_("poll_id", associated_poll_ids)
         else:
             query = query.eq("quiz_id", quiz_id)
+
 
         ans_response = query.execute()
         answers = ans_response.data or []
@@ -448,4 +487,20 @@ def get_last_quiz_results() -> dict | None:
     except Exception as e:
         logger.error(f"Failed to retrieve last quiz results: {e}")
         return None
+
+@log_step(logger)
+def save_poll_mapping(poll_id: str, quiz_id: int) -> bool:
+    """Save a mapping between a Telegram poll_id and our database quiz_id."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    try:
+        client.table("quiz_polls").insert({"poll_id": poll_id, "quiz_id": quiz_id}).execute()
+        logger.info(f"Successfully saved poll mapping in DB: {poll_id} -> {quiz_id}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to save poll mapping: {e}")
+        return False
+
 

@@ -370,8 +370,13 @@ class handler(BaseHTTPRequestHandler):
         chat_id = chat.get("id")
         command_text = message.get("text", "").strip()
 
-        # Check Allowlist
-        is_allowed = is_user_allowed(user_id) if user_id is not None else False
+        # Check Allowlist: Allowed if the user is allowed, OR if the chat group is allowed
+        is_allowed = False
+        if user_id is not None:
+            is_allowed = is_user_allowed(user_id)
+        if not is_allowed and chat_id is not None:
+            is_allowed = is_user_allowed(chat_id)
+
         is_start_cmd = command_text.lower().startswith("/start")
 
         # If user is not allowed and runs /start, record their ID as inactive for admins to approve later
@@ -420,17 +425,17 @@ class handler(BaseHTTPRequestHandler):
                 send_chat_action(chat_id, "upload_document") # "upload_document" / typing
                 quiz_data = generate_quiz()
                 
+                # Save quiz to history first to get the database row ID
+                quiz_id = save_quiz_to_history(
+                    question=quiz_data["question"],
+                    options=quiz_data["options"],
+                    correct_option_id=quiz_data["correct_option_id"],
+                    explanation=quiz_data["explanation"],
+                    category=quiz_data["category"],
+                    poll_id=None
+                )
+                
                 if QUIZ_FORMAT == "inline":
-                    # Save quiz to history first to get the database row ID
-                    quiz_id = save_quiz_to_history(
-                        question=quiz_data["question"],
-                        options=quiz_data["options"],
-                        correct_option_id=quiz_data["correct_option_id"],
-                        explanation=quiz_data["explanation"],
-                        category=quiz_data["category"],
-                        poll_id=None
-                    )
-                    
                     text = (
                         f"🧠 <b>Daily Technical Trivia</b>\n"
                         f"Category: <code>{quiz_data['category']}</code>\n\n"
@@ -467,16 +472,21 @@ class handler(BaseHTTPRequestHandler):
                         is_anonymous=False # Not anonymous, lets them see who voted
                     )
                     
-                    # Save to database histories
-                    poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
-                    save_quiz_to_history(
-                        question=quiz_data["question"],
-                        options=quiz_data["options"],
-                        correct_option_id=quiz_data["correct_option_id"],
-                        explanation=quiz_data["explanation"],
-                        category=quiz_data["category"],
-                        poll_id=poll_id
-                    )
+                    if poll_resp:
+                        poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+                        if poll_id and quiz_id:
+                            from src.db import save_poll_mapping
+                            save_poll_mapping(poll_id, quiz_id)
+                            
+                            # Update the poll_id in quiz_history for consistency
+                            try:
+                                from src.db import get_supabase_client
+                                client = get_supabase_client()
+                                if client:
+                                    client.table("quiz_history").update({"poll_id": poll_id}).eq("id", quiz_id).execute()
+                            except Exception as e:
+                                logger.error(f"Failed to update poll_id in history: {e}")
+
                 
                 response_text = f"Quiz Sent: '{quiz_data['question']}'"
                 topic = quiz_data["category"]
@@ -609,19 +619,17 @@ class handler(BaseHTTPRequestHandler):
 
             sent_count = 0
             errors = []
-            poll_id_to_save = None
-            quiz_id = None
-
-            # If format is inline, save to history first to get database ID
-            if QUIZ_FORMAT == "inline":
-                quiz_id = save_quiz_to_history(
-                    question=quiz_data["question"],
-                    options=quiz_data["options"],
-                    correct_option_id=quiz_data["correct_option_id"],
-                    explanation=quiz_data["explanation"],
-                    category=quiz_data["category"],
-                    poll_id=None
-                )
+            poll_ids = []
+            
+            # Save quiz to history first to get database ID (shared across both inline and poll formats)
+            quiz_id = save_quiz_to_history(
+                question=quiz_data["question"],
+                options=quiz_data["options"],
+                correct_option_id=quiz_data["correct_option_id"],
+                explanation=quiz_data["explanation"],
+                category=quiz_data["category"],
+                poll_id=None
+            )
 
             for chat_id in target_ids:
                 try:
@@ -660,24 +668,30 @@ class handler(BaseHTTPRequestHandler):
                             is_anonymous=False
                         )
 
-                        # Save the poll ID returned for history tracking
-                        if poll_resp and not poll_id_to_save:
-                            poll_id_to_save = poll_resp.get("result", {}).get("poll", {}).get("id")
+                        # Save the poll ID returned for history and mapping lookup
+                        if poll_resp:
+                            p_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+                            if p_id:
+                                poll_ids.append(p_id)
+                                if quiz_id:
+                                    from src.db import save_poll_mapping
+                                    save_poll_mapping(p_id, quiz_id)
                     sent_count += 1
                 except Exception as e:
                     logger.error(f"Failed to send poll/message to chat {chat_id}: {e}")
                     errors.append(f"{chat_id}: {str(e)}")
 
-            # If format was poll, save to history now
-            if QUIZ_FORMAT != "inline":
-                save_quiz_to_history(
-                    question=quiz_data["question"],
-                    options=quiz_data["options"],
-                    correct_option_id=quiz_data["correct_option_id"],
-                    explanation=quiz_data["explanation"],
-                    category=quiz_data["category"],
-                    poll_id=poll_id_to_save
-                )
+            # If format was poll, update quiz_history with all generated poll IDs for backwards compatibility
+            if QUIZ_FORMAT != "inline" and quiz_id and poll_ids:
+                try:
+                    from src.db import get_supabase_client
+                    client = get_supabase_client()
+                    if client:
+                        client.table("quiz_history").update({"poll_id": ",".join(poll_ids)}).eq("id", quiz_id).execute()
+                except Exception as e:
+                    logger.error(f"Failed to update poll_id in quiz_history for quiz {quiz_id}: {e}")
+
+
 
             response_data = {
                 "ok": True,

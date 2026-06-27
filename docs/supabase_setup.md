@@ -90,6 +90,15 @@ on user_quiz_answers (poll_id);
 
 create index if not exists idx_user_quiz_answers_quiz_id 
 on user_quiz_answers (quiz_id);
+
+-- Create quiz_polls lookup table (scales individual DMs to store poll_id to quiz_id mappings)
+create table if not exists quiz_polls (
+  poll_id text primary key,
+  quiz_id bigint references quiz_history(id) on delete cascade,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_quiz_polls_quiz_id on quiz_polls (quiz_id);
 ```
 
 ---
