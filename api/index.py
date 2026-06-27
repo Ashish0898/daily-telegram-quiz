@@ -598,12 +598,13 @@ class handler(BaseHTTPRequestHandler):
             # Fetch active allowed users to send the quiz to
             active_users = [u for u in get_all_users() if u.get("is_active")]
             
-            # Collect unique user/chat IDs to send the quiz to
+            # Collect unique group chat IDs to send the quiz to (negative IDs)
             target_ids = set()
             for user in active_users:
                 uid = user.get("user_id")
-                if uid:
+                if uid and int(uid) < 0:
                     target_ids.add(int(uid))
+
 
             # Also add the main TELEGRAM_CHAT_ID if configured
             if TELEGRAM_CHAT_ID:
