@@ -262,21 +262,34 @@ def save_user_answer(poll_id: str, user_id: int, username: str, selected_option_
     if not client:
         return False
 
+    # Look up the correct answer from quiz history using poll_id
+    is_correct = None
+    try:
+        response = client.table("quiz_history").select("correct_option_id").eq("poll_id", poll_id).execute()
+        if response.data and len(response.data) > 0:
+            correct_option_id = response.data[0].get("correct_option_id")
+            if correct_option_id is not None:
+                is_correct = (selected_option_id == correct_option_id)
+    except Exception as e:
+        logger.error(f"Failed to lookup correctness for poll {poll_id}: {e}")
+
     payload = {
         "poll_id": poll_id,
         "user_id": user_id,
-        "selected_option_id": selected_option_id
+        "selected_option_id": selected_option_id,
+        "is_correct": is_correct
     }
     if username:
         payload["username"] = username.lstrip('@')
 
     try:
         client.table("user_quiz_answers").upsert(payload, on_conflict="poll_id,user_id").execute()
-        logger.info(f"Successfully saved answer in DB for user {user_id} on poll {poll_id}")
+        logger.info(f"Successfully saved answer in DB for user {user_id} on poll {poll_id} (is_correct={is_correct})")
         return True
     except Exception as e:
         logger.error(f"Failed to save user answer to DB: {e}")
         return False
+
 
 @log_step(logger)
 def save_user_inline_answer(quiz_id: int, user_id: int, username: str, selected_option_id: int, is_correct: bool) -> bool:

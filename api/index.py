@@ -596,8 +596,9 @@ class handler(BaseHTTPRequestHandler):
                             options=quiz_data["options"],
                             correct_option_id=quiz_data["correct_option_id"],
                             explanation=quiz_data["explanation"],
-                            is_anonymous=True
+                            is_anonymous=False
                         )
+
                         # Save the poll ID returned for history tracking
                         if poll_resp and not poll_id_to_save:
                             poll_id_to_save = poll_resp.get("result", {}).get("poll", {}).get("id")
