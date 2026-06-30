@@ -59,7 +59,8 @@ def parse_command(text: str) -> dict:
     normalized = trimmed.lower()
 
     if normalized.startswith("/quiz"):
-        return {"type": "quiz", "query": None}
+        query = re.sub(r"^/quiz(@\w+)?\s*", "", trimmed, flags=re.IGNORECASE).strip()
+        return {"type": "quiz", "query": query or None}
 
     if normalized.startswith("/leaderboard") or normalized.startswith("/lb"):
         return {"type": "leaderboard", "query": None}
@@ -86,7 +87,7 @@ def build_help_message(is_admin: bool = False) -> str:
         "🧠 <b>Daily Trivia Quiz Bot</b> 🤖\n\n"
         "I generate and send interactive multiple-choice quiz polls!\n\n"
         "<b>Available Commands:</b>\n"
-        "• /quiz — Generate and send a new interactive quiz right now.\n"
+        "• /quiz [count] — Generate and send new interactive quiz(zes) (default: 1, max: 10).\n"
         "• /leaderboard — View current scores and standings.\n"
         "• /help — Show this help message."
     )
@@ -422,74 +423,93 @@ class handler(BaseHTTPRequestHandler):
                 topic = "help"
 
             elif cmd_type == "quiz":
-                send_chat_action(chat_id, "upload_document") # "upload_document" / typing
-                quiz_data = generate_quiz()
-                
-                # Save quiz to history first to get the database row ID
-                quiz_id = save_quiz_to_history(
-                    question=quiz_data["question"],
-                    options=quiz_data["options"],
-                    correct_option_id=quiz_data["correct_option_id"],
-                    explanation=quiz_data["explanation"],
-                    category=quiz_data["category"],
-                    poll_id=None
-                )
-                
-                if QUIZ_FORMAT == "inline":
-                    text = (
-                        f"🧠 <b>Daily Technical Trivia</b>\n"
-                        f"Category: <code>{quiz_data['category']}</code>\n\n"
-                        f"<b>{quiz_data['question']}</b>\n\n"
-                        f"🇦 {quiz_data['options'][0]}\n"
-                        f"🇧 {quiz_data['options'][1]}\n"
-                    )
-                    if len(quiz_data['options']) > 2:
-                        text += f"🇨 {quiz_data['options'][2]}\n"
-                    if len(quiz_data['options']) > 3:
-                        text += f"🇩 {quiz_data['options'][3]}\n"
-                    text += "\n<i>Tap a button below to submit your answer:</i>"
+                # Determine how many quizzes to send
+                count = 1
+                if query:
+                    try:
+                        count = int(query.strip())
+                        # Restrict count to a reasonable range to avoid Telegram rate limits
+                        count = max(1, min(count, 10))
+                    except ValueError:
+                        pass
 
-                    # Generate inline keyboard A, B, C, D
-                    reply_markup = {
-                        "inline_keyboard": [
-                            [
-                                {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
-                            ]
-                        ]
-                    }
-                    send_message(chat_id, text, reply_markup=reply_markup)
-                else:
-                    # Send Quiz Poll
-                    poll_resp = send_poll(
-                        chat_id=chat_id,
+                quizzes_sent = []
+                last_category = "general"
+                
+                for i in range(count):
+                    send_chat_action(chat_id, "upload_document")
+                    quiz_data = generate_quiz()
+                    last_category = quiz_data.get("category", "general")
+                    
+                    # Save quiz to history first to get the database row ID
+                    quiz_id = save_quiz_to_history(
                         question=quiz_data["question"],
                         options=quiz_data["options"],
                         correct_option_id=quiz_data["correct_option_id"],
                         explanation=quiz_data["explanation"],
-                        is_anonymous=False # Not anonymous, lets them see who voted
+                        category=quiz_data["category"],
+                        poll_id=None
                     )
                     
-                    if poll_resp:
-                        poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
-                        if poll_id and quiz_id:
-                            from src.db import save_poll_mapping
-                            save_poll_mapping(poll_id, quiz_id)
-                            
-                            # Update the poll_id in quiz_history for consistency
-                            try:
-                                from src.db import get_supabase_client
-                                client = get_supabase_client()
-                                if client:
-                                    client.table("quiz_history").update({"poll_id": poll_id}).eq("id", quiz_id).execute()
-                            except Exception as e:
-                                logger.error(f"Failed to update poll_id in history: {e}")
+                    if QUIZ_FORMAT == "inline":
+                        text = (
+                            f"🧠 <b>Daily Technical Trivia</b>\n"
+                            f"Category: <code>{quiz_data['category']}</code>\n\n"
+                            f"<b>{quiz_data['question']}</b>\n\n"
+                            f"🇦 {quiz_data['options'][0]}\n"
+                            f"🇧 {quiz_data['options'][1]}\n"
+                        )
+                        if len(quiz_data['options']) > 2:
+                            text += f"🇨 {quiz_data['options'][2]}\n"
+                        if len(quiz_data['options']) > 3:
+                            text += f"🇩 {quiz_data['options'][3]}\n"
+                        text += "\n<i>Tap a button below to submit your answer:</i>"
 
-                
-                response_text = f"Quiz Sent: '{quiz_data['question']}'"
-                topic = quiz_data["category"]
+                        # Generate inline keyboard A, B, C, D
+                        reply_markup = {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                    {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
+                                ]
+                            ]
+                        }
+                        send_message(chat_id, text, reply_markup=reply_markup)
+                    else:
+                        # Send Quiz Poll
+                        poll_resp = send_poll(
+                            chat_id=chat_id,
+                            question=quiz_data["question"],
+                            options=quiz_data["options"],
+                            correct_option_id=quiz_data["correct_option_id"],
+                            explanation=quiz_data["explanation"],
+                            is_anonymous=False # Not anonymous, lets them see who voted
+                        )
+                        
+                        if poll_resp:
+                            poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+                            if poll_id and quiz_id:
+                                from src.db import save_poll_mapping
+                                save_poll_mapping(poll_id, quiz_id)
+                                
+                                try:
+                                    from src.db import get_supabase_client
+                                    client = get_supabase_client()
+                                    if client:
+                                        client.table("quiz_history").update({"poll_id": poll_id}).eq("id", quiz_id).execute()
+                                except Exception as e:
+                                    logger.error(f"Failed to update poll_id in history: {e}")
+                    
+                    quizzes_sent.append(quiz_data["question"])
+                    
+                    # Add a small delay between sending multiple quizzes
+                    if i < count - 1:
+                        time.sleep(0.5)
+
+                response_text = f"Quiz(zes) Sent: {', '.join([repr(q) for q in quizzes_sent])}"
+                topic = f"quiz_multiple_{count}_{last_category}"
 
             elif cmd_type == "leaderboard":
                 send_chat_action(chat_id, "typing")
@@ -591,10 +611,21 @@ class handler(BaseHTTPRequestHandler):
         start_time = time.time()
         logger.info("Incoming GET/POST request for daily quiz cron scheduler.")
 
+        # Default count for the scheduler is 3 quizzes per run, but can be overridden via query parameter
+        count = 3
         try:
-            # Generate Quiz once to share across all users
-            quiz_data = generate_quiz()
-            
+            matched_path = self.headers.get('x-matched-path') or self.headers.get('x-forwarded-uri')
+            url_to_parse = matched_path if matched_path else self.path
+            parsed_url = urlparse(url_to_parse)
+            query_params = parse_qs(parsed_url.query)
+            count_str = query_params.get("count", [None])[0]
+            if count_str:
+                count = int(count_str)
+                count = max(1, min(count, 20)) # Restrict to max 20 to avoid timeouts/rate-limits
+        except Exception as e:
+            logger.warning(f"Could not parse count parameter, defaulting to {count}: {e}")
+
+        try:
             # Fetch active allowed users to send the quiz to
             active_users = [u for u in get_all_users() if u.get("is_active")]
             
@@ -604,7 +635,6 @@ class handler(BaseHTTPRequestHandler):
                 uid = user.get("user_id")
                 if uid and int(uid) < 0:
                     target_ids.add(int(uid))
-
 
             # Also add the main TELEGRAM_CHAT_ID if configured
             if TELEGRAM_CHAT_ID:
@@ -618,86 +648,96 @@ class handler(BaseHTTPRequestHandler):
                 self.send_json(400, {"error": "No active allowed users or TELEGRAM_CHAT_ID configured"})
                 return
 
-            sent_count = 0
+            total_sent_count = 0
             errors = []
-            poll_ids = []
-            
-            # Save quiz to history first to get database ID (shared across both inline and poll formats)
-            quiz_id = save_quiz_to_history(
-                question=quiz_data["question"],
-                options=quiz_data["options"],
-                correct_option_id=quiz_data["correct_option_id"],
-                explanation=quiz_data["explanation"],
-                category=quiz_data["category"],
-                poll_id=None
-            )
+            quizzes_sent = []
+            last_category = "general"
 
-            for chat_id in target_ids:
-                try:
-                    if QUIZ_FORMAT == "inline":
-                        text = (
-                            f"🧠 <b>Daily Technical Trivia</b>\n"
-                            f"Category: <code>{quiz_data['category']}</code>\n\n"
-                            f"<b>{quiz_data['question']}</b>\n\n"
-                            f"🇦 {quiz_data['options'][0]}\n"
-                            f"🇧 {quiz_data['options'][1]}\n"
-                        )
-                        if len(quiz_data['options']) > 2:
-                            text += f"🇨 {quiz_data['options'][2]}\n"
-                        if len(quiz_data['options']) > 3:
-                            text += f"🇩 {quiz_data['options'][3]}\n"
-                        text += "\n<i>Tap a button below to submit your answer:</i>"
+            for i in range(count):
+                # Generate Quiz once per iteration to share across all users
+                quiz_data = generate_quiz()
+                last_category = quiz_data.get("category", "general")
+                
+                # Save quiz to history first to get database ID (shared across both inline and poll formats)
+                quiz_id = save_quiz_to_history(
+                    question=quiz_data["question"],
+                    options=quiz_data["options"],
+                    correct_option_id=quiz_data["correct_option_id"],
+                    explanation=quiz_data["explanation"],
+                    category=quiz_data["category"],
+                    poll_id=None
+                )
 
-                        reply_markup = {
-                            "inline_keyboard": [
-                                [
-                                    {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                    {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                    {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
-                                    {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
+                poll_ids = []
+                for chat_id in target_ids:
+                    try:
+                        if QUIZ_FORMAT == "inline":
+                            text = (
+                                f"🧠 <b>Daily Technical Trivia</b>\n"
+                                f"Category: <code>{quiz_data['category']}</code>\n\n"
+                                f"<b>{quiz_data['question']}</b>\n\n"
+                                f"🇦 {quiz_data['options'][0]}\n"
+                                f"🇧 {quiz_data['options'][1]}\n"
+                            )
+                            if len(quiz_data['options']) > 2:
+                                text += f"🇨 {quiz_data['options'][2]}\n"
+                            if len(quiz_data['options']) > 3:
+                                text += f"🇩 {quiz_data['options'][3]}\n"
+                            text += "\n<i>Tap a button below to submit your answer:</i>"
+
+                            reply_markup = {
+                                "inline_keyboard": [
+                                    [
+                                        {"text": "A", "callback_data": f"qa:0:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                        {"text": "B", "callback_data": f"qa:1:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                        {"text": "C", "callback_data": f"qa:2:{quiz_data['correct_option_id']}:{quiz_id}"},
+                                        {"text": "D", "callback_data": f"qa:3:{quiz_data['correct_option_id']}:{quiz_id}"}
+                                    ]
                                 ]
-                            ]
-                        }
-                        send_message(chat_id, text, reply_markup=reply_markup)
-                    else:
-                        poll_resp = send_poll(
-                            chat_id=chat_id,
-                            question=quiz_data["question"],
-                            options=quiz_data["options"],
-                            correct_option_id=quiz_data["correct_option_id"],
-                            explanation=quiz_data["explanation"],
-                            is_anonymous=False
-                        )
+                            }
+                            send_message(chat_id, text, reply_markup=reply_markup)
+                        else:
+                            poll_resp = send_poll(
+                                chat_id=chat_id,
+                                question=quiz_data["question"],
+                                options=quiz_data["options"],
+                                correct_option_id=quiz_data["correct_option_id"],
+                                explanation=quiz_data["explanation"],
+                                is_anonymous=False
+                            )
 
-                        # Save the poll ID returned for history and mapping lookup
-                        if poll_resp:
-                            p_id = poll_resp.get("result", {}).get("poll", {}).get("id")
-                            if p_id:
-                                poll_ids.append(p_id)
-                                if quiz_id:
+                            # Save the poll ID returned for history and mapping lookup
+                            if poll_resp:
+                                p_id = poll_resp.get("result", {}).get("poll", {}).get("id")
+                                if p_id:
+                                    poll_ids.append(p_id)
                                     from src.db import save_poll_mapping
                                     save_poll_mapping(p_id, quiz_id)
-                    sent_count += 1
-                except Exception as e:
-                    logger.error(f"Failed to send poll/message to chat {chat_id}: {e}")
-                    errors.append(f"{chat_id}: {str(e)}")
+                        total_sent_count += 1
+                    except Exception as e:
+                        logger.error(f"Failed to send poll/message to chat {chat_id}: {e}")
+                        errors.append(f"{chat_id}: {str(e)}")
 
-            # If format was poll, update quiz_history with all generated poll IDs for backwards compatibility
-            if QUIZ_FORMAT != "inline" and quiz_id and poll_ids:
-                try:
-                    from src.db import get_supabase_client
-                    client = get_supabase_client()
-                    if client:
-                        client.table("quiz_history").update({"poll_id": ",".join(poll_ids)}).eq("id", quiz_id).execute()
-                except Exception as e:
-                    logger.error(f"Failed to update poll_id in quiz_history for quiz {quiz_id}: {e}")
+                # If format was poll, update quiz_history with all generated poll IDs for backwards compatibility
+                if QUIZ_FORMAT != "inline" and quiz_id and poll_ids:
+                    try:
+                        from src.db import get_supabase_client
+                        client = get_supabase_client()
+                        if client:
+                            client.table("quiz_history").update({"poll_id": ",".join(poll_ids)}).eq("id", quiz_id).execute()
+                    except Exception as e:
+                        logger.error(f"Failed to update poll_id in quiz_history for quiz {quiz_id}: {e}")
 
+                quizzes_sent.append(quiz_data["question"])
 
+                # Add a small delay between sending multiple quizzes
+                if i < count - 1:
+                    time.sleep(0.5)
 
             response_data = {
                 "ok": True,
-                "quiz": quiz_data["question"],
-                "sent_count": sent_count,
+                "quizzes": quizzes_sent,
+                "sent_count": total_sent_count,
             }
             if errors:
                 response_data["errors"] = errors
@@ -705,11 +745,11 @@ class handler(BaseHTTPRequestHandler):
             self.send_json(200, response_data)
             log_request(
                 endpoint="quiz_scheduler",
-                status="success" if sent_count > 0 else "error",
+                status="success" if total_sent_count > 0 else "error",
                 chat_id=list(target_ids)[0] if target_ids else None,
                 command="scheduler_run",
                 response_content=json.dumps(response_data),
-                topic=quiz_data["category"],
+                topic=f"multiple_{count}_{last_category}",
                 execution_time_ms=int((time.time() - start_time) * 1000)
             )
 
