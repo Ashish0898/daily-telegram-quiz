@@ -2,22 +2,29 @@
 
 An interactive daily technical and logic trivia bot that generates high-quality multiple-choice questions using the GitHub LLM API (`openai/gpt-4.1-nano`) and delivers them to Telegram using native quiz polls.
 
-Features:
+---
+
+### 📋 Documentation Info
+* **Last Documented Commit**: `12442eb8a47bee8059bdc218525c5e916d1b5dcd` ("Add TELEGRAM_ADMIN_USERNAME to configuration for access request notifications")
+* **Status**: Up-to-date with latest difficulty tiers, duplicate prevention, seeds separation, and admin approval notifications.
+
+---
+
+## Features:
 - 📊 **Native Quiz Polls**: Delivers native Telegram quiz cards. Telegram handles option selection, score reveals, and correct/incorrect logic client-side.
-- 🧠 **Daily Technical Themes**: Generates intermediate-to-advanced software engineering questions matching a weekly schedule:
-  * **Monday**: Data Structures
-  * **Tuesday**: Algorithms & Complexity
-  * **Wednesday**: Databases & SQL
-  * **Thursday**: System Design & Networking
-  * **Friday**: Programming Languages & Runtimes
-  * **Saturday**: DevOps, Git & OS
-  * **Sunday**: Tech History, Logic & Riddles
+- ⚙️ **Batch Quizzes & Cron Trigger**: Integrates with Vercel Crons (`/api/quiz`) to post quizzes automatically. The scheduler defaults to sending **5 quizzes** per run, supporting custom counts via query parameters (e.g. `/api/quiz?count=3`).
+- 🧠 **Dynamic Difficulty Tiers**: Quizzes are grouped into 4 distinct difficulty levels:
+  * **Easy** (35% chance): Beginner-friendly definitions, fundamental syntax, and basic logic.
+  * **Intermediate** (35% chance): Core senior-level engineering concepts and common optimizations.
+  * **Advanced** (20% chance): Deep runtime internals, execution paths, and design trade-offs.
+  * **Elite** (10% chance): Highly complex low-level concurrency, kernel configurations, and distributed consensus details.
+- 📂 **Externalized Seeds**: The database of themes and category seeds has been separated from code into [src/seeds.json](src/seeds.json) for easy customization.
+- 🛡️ **Duplicate Prevention**: Queries the Supabase history and feeds recently asked questions to the LLM as negative prompt constraints, mathematically guaranteeing unique daily questions.
 - 🔒 **Webhook Security & Allowlist**:
   - Validates webhook tokens using `X-Telegram-Bot-Api-Secret-Token`.
-  - Checks incoming messages against a Supabase allowlist table.
-- 📈 **Auditing & History**: Logs all API requests to Supabase `request_audit` and stores sent questions in a `quiz_history` table to avoid duplication.
-- ⚡ **Cron Trigger**: Integrates with Vercel Crons to post daily quizzes automatically at a designated time.
-
+  - Checks incoming messages against a Supabase `allowed_users` allowlist table.
+- 🔔 **Real-Time Admin Approvals**: When an unauthorized user runs `/start`, the bot logs them as inactive and immediately sends a Telegram alert to all admins containing a copy-pasteable `/allow <user_id>` approval command.
+- 📈 **Auditing & History**: Logs all bot operations to Supabase `request_audit` and stores sent questions in the `quiz_history` table.
 
 ---
 
@@ -28,7 +35,7 @@ Features:
 2. Disable Group Privacy if you wish to run the bot in group chats (optional).
 
 ### 2. Supabase Setup
-Follow the [Supabase Setup Guide](docs/supabase_setup.md) to set up your PostgreSQL tables (`quiz_history`, `allowed_users`, and `request_audit`).
+Follow the [Supabase Setup Guide](docs/supabase_setup.md) to set up your PostgreSQL tables (`quiz_history`, `allowed_users`, `request_audit`, and `quiz_polls`).
 
 ### 3. Vercel Deployment & Environment Variables
 Deploy this repository to Vercel and add these environment variables:
@@ -42,6 +49,7 @@ Deploy this repository to Vercel and add these environment variables:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role secret API key (bypasses RLS to write audit logs). |
 | `TELEGRAM_WEBHOOK_SECRET` | A secure, random string used to sign and verify incoming webhook requests from Telegram. |
 | `TELEGRAM_ADMIN_USER_IDS` | Comma-separated list of Telegram User IDs who have administrator roles. |
+| `TELEGRAM_ADMIN_USERNAME` | *Optional*: The Telegram handle of the main admin (e.g. `@username`), displayed to unauthorized users to request access. |
 
 ---
 
@@ -51,17 +59,14 @@ Use curl to register your Vercel deployment URL with Telegram (replace placehold
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
      -H "Content-Type: application/json" \
      -d '{"url": "https://<your-vercel-domain>.vercel.app/api/telegram", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["message", "callback_query", "poll_answer"]}'
-
-
 ```
 
 ---
 
 ## Webhook Commands
-- `/quiz` — Generates a new quiz question on the fly and posts it to the chat.
+- `/quiz [count]` — Generates and posts the specified number of quizzes (default: 1, max: 10).
 - `/leaderboard` (or `/lb`) — Displays the current player rankings, weekly standings, and accuracy scores.
 - `/help` — Displays a helpful interface with lists of bot commands.
-
 
 **Admin-Only Commands:**
 - `/allow <username_or_id> [role]` — Registers/activates a user to use the bot.
@@ -80,6 +85,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
    SUPABASE_URL="your_supabase_url"
    SUPABASE_SERVICE_ROLE_KEY="your_supabase_key"
    TELEGRAM_ADMIN_USER_IDS="your_telegram_id"
+   TELEGRAM_ADMIN_USERNAME="@your_username"
    ```
 3. Install dependencies:
    ```bash
