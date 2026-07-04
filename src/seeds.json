@@ -2,6 +2,15 @@
   "0": {
     "category": "Data Structures",
     "seeds": {
+      "easy": [
+        "arrays",
+        "array list lookup time complexity",
+        "queue FIFO concept",
+        "stack LIFO concept",
+        "string manipulation",
+        "binary search tree definition",
+        "node definition"
+      ],
       "intermediate": [
         "singly/doubly linked lists",
         "dynamic arrays (amortized O(1))",
@@ -34,6 +43,14 @@
   "1": {
     "category": "Algorithms & Complexity",
     "seeds": {
+      "easy": [
+        "constant time O(1) definition",
+        "linear time O(N) definition",
+        "bubble sort mechanics",
+        "linear search vs binary search",
+        "recursion base case",
+        "nested loops complexity"
+      ],
       "intermediate": [
         "Big O amortized time/space complexity",
         "recursive backtracking",
@@ -70,6 +87,15 @@
   "2": {
     "category": "Databases & SQL",
     "seeds": {
+      "easy": [
+        "primary key definition",
+        "foreign key definition",
+        "SELECT query syntax",
+        "WHERE clause filtering",
+        "index definition",
+        "database tables",
+        "relational vs non-relational definition"
+      ],
       "intermediate": [
         "SQL joins & outer join nuances",
         "ACID properties (Write-Ahead Logging)",
@@ -102,6 +128,14 @@
   "3": {
     "category": "System Design & Architecture",
     "seeds": {
+      "easy": [
+        "client-server model",
+        "DNS purpose",
+        "HTTP status codes (200, 404, 500)",
+        "load balancer definition",
+        "database replication concept",
+        "API definition"
+      ],
       "intermediate": [
         "DNS resolution flow",
         "UDP vs TCP use cases",
@@ -133,6 +167,15 @@
   "4": {
     "category": "Python Programming",
     "seeds": {
+      "easy": [
+        "lists vs tuples",
+        "dictionary key-value access",
+        "variable scope",
+        "local vs global variables",
+        "basic function definition",
+        "list comprehensions",
+        "print formatting"
+      ],
       "intermediate": [
         "iterator and generator protocols",
         "decorators (wrappers, closures)",
@@ -162,6 +205,15 @@
   "5": {
     "category": "DevOps, Git & Linux",
     "seeds": {
+      "easy": [
+        "git clone",
+        "git add",
+        "git commit",
+        "git push",
+        "git pull",
+        "basic linux directory commands (ls, cd, pwd)",
+        "docker container definition"
+      ],
       "intermediate": [
         "OverlayFS copy-on-write storage layers",
         "Linux file system permissions (chmod, chown, setuid)",
@@ -196,6 +248,12 @@
   "6": {
     "category": "Tech History & Riddles",
     "seeds": {
+      "easy": [
+        "inventor of Python",
+        "inventor of the World Wide Web",
+        "basic binary arithmetic",
+        "classic riddles (crossing river with wolf/goat/cabbage)"
+      ],
       "intermediate": [
         "famous computer scientists (Turing, Shannon, Hopper)",
         "classic logic & algorithmic riddles",

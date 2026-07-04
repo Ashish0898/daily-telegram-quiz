@@ -56,9 +56,9 @@ def generate_quiz() -> dict:
     theme = THEME_SCHEDULE[weekday]
     category = theme["category"]
     
-    # Choose a difficulty tier randomly, biasing towards Advanced and Elite
-    tiers = ["intermediate", "advanced", "elite"]
-    weights = [0.20, 0.50, 0.30]
+    # Choose a difficulty tier randomly
+    tiers = ["easy", "intermediate", "advanced", "elite"]
+    weights = [0.40, 0.30, 0.20, 0.10]
     selected_tier = random.choices(tiers, weights=weights)[0]
     
     seeds_list = theme["seeds"][selected_tier]
@@ -81,18 +81,20 @@ def generate_quiz() -> dict:
     logger.info(f"Preparing LLM prompt for daily category: '{category}' (tier: {selected_tier}, seeds: '{seed_text}')")
 
     system_prompt = (
-        "You are an expert technical interviewer and staff-level software engineering assessment designer. "
-        "Your task is to generate a single highly challenging, accurate multiple-choice question testing deep conceptual details, internal workings, or architectural trade-offs. "
+        "You are an expert technical interviewer and software engineering assessment designer. "
+        "Your task is to generate a single highly engaging, accurate multiple-choice question testing conceptual details, internal workings, or trade-offs matching the target difficulty."
         "You MUST respond ONLY with a valid JSON object. Do not include markdown code block formatting like ```json or any explanations outside the JSON."
     )
 
     user_prompt = (
-        f"Generate an advanced technical multiple-choice question.\n"
+        f"Generate a technical multiple-choice question.\n"
         f"- Today's Category: {category}\n"
         f"- Concept Seeds: {seed_text}\n"
         f"- Target Difficulty Tier: {selected_tier.upper()}\n"
     )
-    if selected_tier == "intermediate":
+    if selected_tier == "easy":
+        user_prompt += "  - Difficulty Guidelines: Target basic definitions, fundamental language syntax, core command usage, or simple conceptual flow. Keep it beginner-friendly and accessible.\n\n"
+    elif selected_tier == "intermediate":
         user_prompt += "  - Difficulty Guidelines: Target core senior-level concepts, common optimization scenarios, or solid systems design building blocks. Candidate should need clear reasoning but standard knowledge.\n\n"
     elif selected_tier == "advanced":
         user_prompt += "  - Difficulty Guidelines: Target deep internals, runtime execution paths, low-level system calls, database storage layout compactions, or complex concurrency trade-offs.\n\n"
