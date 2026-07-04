@@ -53,7 +53,7 @@ def generate_quiz() -> dict:
 
     # Determine topic based on today's weekday
     weekday = datetime.now(timezone.utc).weekday()
-    theme = THEME_SCHEDULE[6]
+    theme = THEME_SCHEDULE[weekday]
     category = theme["category"]
     
     # Choose a difficulty tier randomly, biasing towards Advanced and Elite
