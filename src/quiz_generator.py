@@ -10,40 +10,28 @@ from utils import log_step
 logger = logging.getLogger("quiz_generator")
 
 # Weekday theme mapping (0=Monday, 6=Sunday)
-THEME_SCHEDULE = {
-    0: {
-        "category": "Data Structures",
-        "seed": "arrays, hash tables, linked lists, binary trees, heaps, graphs, tries"
-    },
-    1: {
-        "category": "Algorithms & Complexity",
-        "seed": "Big O time/space complexity, sorting, binary search, recursion, dynamic programming, sliding window, two-pointers"
-    },
-    2: {
-        "category": "Databases & SQL",
-        "seed": "indexing, execution plans, SQL joins, ACID properties, database isolation levels, sharding, replication, NoSQL trade-offs"
-    },
-    3: {
-        "category": "System Design & Architecture",
-        "seed": "caching strategies (LRU/LFU), load balancing, DNS, TCP vs UDP, CDN, microservices, rate limiting, message queues, event-driven design"
-    },
-    4: {
-        "category": "Python Programming",
-        "seed": "Python internals, data model, iterator protocol, async/await, decorators, context managers, Python GIL, memory model"
-    },
-    5: {
-        "category": "DevOps, Git & Linux",
-        "seed": "Docker containers, CI/CD pipeline principles, git rebase vs merge, linux process scheduling, file system permissions, shell commands"
-    },
-    6: {
-        "category": "Tech History & Riddles",
-        "seed": "famous computer scientists, classic logic riddles, Turing machines, historic software bugs, cryptography basics (RSA/AES)"
+# Weekday theme mapping (0=Monday, 6=Sunday), loaded dynamically from seeds.json
+SEEDS_FILE_PATH = os.path.join(os.path.dirname(__file__), "seeds.json")
+try:
+    with open(SEEDS_FILE_PATH, "r", encoding="utf-8") as f:
+        THEME_SCHEDULE = {int(k): v for k, v in json.load(f).items()}
+except Exception as e:
+    logger.error(f"Failed to load seeds.json: {e}")
+    # Minimal fallback in case seeds.json is missing or corrupted
+    THEME_SCHEDULE = {
+        i: {
+            "category": "General Tech",
+            "seeds": {
+                "intermediate": ["software patterns", "algorithms"],
+                "advanced": ["concurrency", "distributed systems"],
+                "elite": ["kernel internals", "low-level optimizations"]
+            }
+        } for i in range(7)
     }
-}
 
 EXCLUDE_CLICHES = (
-    "Avoid extremely basic or common textbook questions (e.g., 'What does HTML stand for?' or 'What is Big O of binary search?'). "
-    "Make questions challenging, equivalent to intermediate-to-advanced technical interview questions."
+    "Avoid basic definition questions, syntax queries, or standard textbook scenarios (e.g. basic SQL joins or decorators). "
+    "Focus on deep engineering internals, performance edge-cases, cache locality, memory layout, low-level systems mechanics, and design tradeoffs."
 )
 
 @log_step(logger)
@@ -65,23 +53,62 @@ def generate_quiz() -> dict:
 
     # Determine topic based on today's weekday
     weekday = datetime.now(timezone.utc).weekday()
-    theme = THEME_SCHEDULE[weekday]
+    theme = THEME_SCHEDULE[6]
     category = theme["category"]
-    seed = theme["seed"]
+    
+    # Choose a difficulty tier randomly, biasing towards Advanced and Elite
+    tiers = ["intermediate", "advanced", "elite"]
+    weights = [0.20, 0.50, 0.30]
+    selected_tier = random.choices(tiers, weights=weights)[0]
+    
+    seeds_list = theme["seeds"][selected_tier]
+    
+    # Randomly select a subset of 2 concept seeds to increase variety
+    if len(seeds_list) > 2:
+        selected_seeds = random.sample(seeds_list, min(2, len(seeds_list)))
+        seed_text = ", ".join(selected_seeds)
+    else:
+        seed_text = ", ".join(seeds_list)
 
-    logger.info(f"Preparing LLM prompt for daily category: '{category}'")
+    # Fetch recent questions from the database to pass as negative constraints
+    recent_questions = []
+    try:
+        from db import get_recent_questions
+        recent_questions = get_recent_questions(category, limit=15)
+    except Exception as e:
+        logger.warning(f"Could not retrieve recent questions from database: {e}")
+
+    logger.info(f"Preparing LLM prompt for daily category: '{category}' (tier: {selected_tier}, seeds: '{seed_text}')")
 
     system_prompt = (
-        "You are an expert technical interviewer and software engineering assessment designer. "
-        "Your task is to generate a single highly engaging, accurate multiple-choice question. "
+        "You are an expert technical interviewer and staff-level software engineering assessment designer. "
+        "Your task is to generate a single highly challenging, accurate multiple-choice question testing deep conceptual details, internal workings, or architectural trade-offs. "
         "You MUST respond ONLY with a valid JSON object. Do not include markdown code block formatting like ```json or any explanations outside the JSON."
     )
 
     user_prompt = (
-        f"Generate a technical software engineering multiple-choice question.\n"
+        f"Generate an advanced technical multiple-choice question.\n"
         f"- Today's Category: {category}\n"
-        f"- Concept Seeds: {seed}\n"
-        f"- Target Difficulty: Intermediate to Advanced (suitable for a mid-to-senior engineer interview)\n\n"
+        f"- Concept Seeds: {seed_text}\n"
+        f"- Target Difficulty Tier: {selected_tier.upper()}\n"
+    )
+    if selected_tier == "intermediate":
+        user_prompt += "  - Difficulty Guidelines: Target core senior-level concepts, common optimization scenarios, or solid systems design building blocks. Candidate should need clear reasoning but standard knowledge.\n\n"
+    elif selected_tier == "advanced":
+        user_prompt += "  - Difficulty Guidelines: Target deep internals, runtime execution paths, low-level system calls, database storage layout compactions, or complex concurrency trade-offs.\n\n"
+    elif selected_tier == "elite":
+        user_prompt += "  - Difficulty Guidelines: Target extremely complex low-level details, lock-free concurrent programming synchronizations (like epoch reclamation / memory fences), distributed consensus corner cases (Raft/Paxos membership changes), or kernel level optimizations. Question should test the top 1% of staff engineers.\n\n"
+
+    if recent_questions:
+        exclusion_list = "\n".join([f"- {q}" for q in recent_questions])
+        user_prompt += (
+            f"CRITICAL CONSTRAINT (PREVENT DUPLICATES):\n"
+            f"Do NOT generate questions similar or identical to the following recently asked questions:\n"
+            f"{exclusion_list}\n\n"
+            f"Focus on different sub-topics, angles, or concepts within {category} that are distinct from the list above.\n\n"
+        )
+
+    user_prompt += (
         f"CRITICAL CONSTRAINTS:\n"
         f"1. The question must be a multiple choice query with exactly 4 options.\n"
         f"2. Only one option must be correct. The other three options must be plausible distractors (not obviously wrong).\n"

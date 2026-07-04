@@ -504,3 +504,44 @@ def save_poll_mapping(poll_id: str, quiz_id: int) -> bool:
         return False
 
 
+@log_step(logger)
+def get_recent_questions(category: str = None, limit: int = 15) -> list[str]:
+    """Retrieve the text of the most recent questions, optionally filtered by category, to avoid duplicates."""
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        query = client.table("quiz_history").select("question")
+        if category:
+            query = query.eq("category", category)
+            
+        response = query.order("created_at", desc=True).limit(limit).execute()
+        questions = []
+        if response.data:
+            questions = [row.get("question") for row in response.data if row.get("question")]
+            
+        # If we filtered by category but found fewer than 5 questions, fall back to getting overall recent questions
+        if category and len(questions) < 5:
+            fallback_response = (
+                client.table("quiz_history")
+                .select("question")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            if fallback_response.data:
+                fallback_questions = [row.get("question") for row in fallback_response.data if row.get("question")]
+                seen = set(questions)
+                for q in fallback_questions:
+                    if q not in seen:
+                        questions.append(q)
+                        seen.add(q)
+                        
+        return questions[:limit]
+    except Exception as e:
+        logger.error(f"Failed to retrieve recent questions: {e}")
+        return []
+
+
+

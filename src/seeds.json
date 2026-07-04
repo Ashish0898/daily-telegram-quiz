@@ -1,0 +1,224 @@
+{
+  "0": {
+    "category": "Data Structures",
+    "seeds": {
+      "intermediate": [
+        "singly/doubly linked lists",
+        "dynamic arrays (amortized O(1))",
+        "binary search trees (BST insertion/deletion)",
+        "binary/binomial heaps",
+        "Bloom filters",
+        "ring buffers",
+        "sparse tables"
+      ],
+      "advanced": [
+        "Log-Structured Merge (LSM) Trees & SS-Tables",
+        "Skip Lists",
+        "B+ Trees database page layout",
+        "splay trees & self-adjusting heuristics",
+        "segment trees with lazy propagation",
+        "Fenwick trees (binary indexed trees)",
+        "Bloom and Cuckoo filters (false positive rates)",
+        "quadtrees & R-trees spatial indexing"
+      ],
+      "elite": [
+        "lock-free/wait-free concurrent structures (hazard pointers, epoch-based reclamation)",
+        "cuckoo hashing & Robin Hood hashing collision heuristics",
+        "HyperLogLog cardinality estimation",
+        "Merkle trees & distributed state verification",
+        "persistent/immutable data structures",
+        "cache-oblivious algorithms layout"
+      ]
+    }
+  },
+  "1": {
+    "category": "Algorithms & Complexity",
+    "seeds": {
+      "intermediate": [
+        "Big O amortized time/space complexity",
+        "recursive backtracking",
+        "sliding window optimization",
+        "two-pointers (slow/fast)",
+        "Dijkstra and A* pathfinding",
+        "depth-first vs breadth-first search",
+        "Topological Sort",
+        "divide-and-conquer master theorem limits"
+      ],
+      "advanced": [
+        "stable vs unstable sort hardware cache locality (quicksort vs mergesort)",
+        "binary search boundaries",
+        "Kruskal/Prim minimum spanning tree",
+        "Knuth-Morris-Pratt failure functions",
+        "Johnson's all-pairs shortest paths",
+        "Knuth DP optimization",
+        "Convex Hull Trick"
+      ],
+      "elite": [
+        "potential method amortized analysis",
+        "Tarjan strongly connected components",
+        "Edmonds-Karp & Dinic maximum flow",
+        "bipartite matching",
+        "digit dynamic programming",
+        "dynamic programming bitmasking state compression",
+        "Aho-Corasick string matching automaton",
+        "suffix automata & suffix arrays",
+        "Heavy-Light Decomposition (HLD) on trees",
+        "P vs NP-complete reductions & approximation algorithms"
+      ]
+    }
+  },
+  "2": {
+    "category": "Databases & SQL",
+    "seeds": {
+      "intermediate": [
+        "SQL joins & outer join nuances",
+        "ACID properties (Write-Ahead Logging)",
+        "master-slave vs multi-master replication",
+        "NoSQL trade-offs (CAP theorem, PACELC)",
+        "database normalization vs denormalization",
+        "connection pooling",
+        "database views & materialized views"
+      ],
+      "advanced": [
+        "B-Tree and LSM-Tree indexing",
+        "database execution plans & scan types",
+        "transaction isolation levels (phantom reads vs write skew)",
+        "LSM-tree size-tiered vs leveled compaction",
+        "database cost-based optimizer (CBO) join ordering (System R dynamic programming)",
+        "consistent hashing with virtual nodes"
+      ],
+      "elite": [
+        "multi-version concurrency control (MVCC) rollback segments",
+        "writeskew anomalies under snapshot isolation",
+        "write-ahead logging (WAL) ARIES recovery algorithm",
+        "InnoDB doublewrite buffering",
+        "Google Spanner TrueTime commit wait consensus",
+        "Google Percolator 2-phase lock (2PL) with MVCC",
+        "distributed consensus (Paxos vs Raft)",
+        "distributed transactions (2PC vs 3PC vs Saga pattern)"
+      ]
+    }
+  },
+  "3": {
+    "category": "System Design & Architecture",
+    "seeds": {
+      "intermediate": [
+        "DNS resolution flow",
+        "UDP vs TCP use cases",
+        "CDN edge caching",
+        "microservices service discovery",
+        "API gateway routing",
+        "load balancing algorithms (round-robin)"
+      ],
+      "advanced": [
+        "gossip protocols & anti-entropy replication",
+        "Kafka partition rebalancing & log compaction",
+        "token bucket vs leaky bucket rate limiting",
+        "circuit breaker state transitions",
+        "CAP vs PACELC theorems tradeoffs",
+        "CDN edge cache invalidation consistency models",
+        "microservices service mesh sidecars (Envoy)"
+      ],
+      "elite": [
+        "Dynamo sloppy quorums & hinted handoff & read repair",
+        "vector clocks vs lamport timestamps",
+        "Kafka exactly-once semantics (transactional producers)",
+        "GC-aware rate limiting",
+        "backpressure propagation & load shedding",
+        "multi-region active-active split-brain mitigation",
+        "TCP handshake & congestion control algorithms (BBR vs Cubic)"
+      ]
+    }
+  },
+  "4": {
+    "category": "Python Programming",
+    "seeds": {
+      "intermediate": [
+        "iterator and generator protocols",
+        "decorators (wrappers, closures)",
+        "context managers (__enter__/__exit__)",
+        "__slots__ memory layout implications",
+        "typing & type annotations",
+        "namespace lookup LEGB resolution mechanics"
+      ],
+      "advanced": [
+        "async/await event loop mechanics",
+        "descriptor protocol (__get__/__set__/__delete__) custom descriptors",
+        "metaclasses & custom class construction (__new__ vs __init__)",
+        "method resolution order (C3 linearization algorithm)",
+        "Python C API & PyBind11 bindings",
+        "memoryviews & buffer protocol high-performance arrays"
+      ],
+      "elite": [
+        "CPython bytecode evaluation loop (ceval.c) opcodes",
+        "PyMalloc block/pool/arena allocator hierarchy",
+        "generational cyclic garbage collection thresholds",
+        "GIL release signaling & OS thread interactions",
+        "asyncio event loop selectors (epoll/kqueue) integration",
+        "coroutine generator suspension state objects"
+      ]
+    }
+  },
+  "5": {
+    "category": "DevOps, Git & Linux",
+    "seeds": {
+      "intermediate": [
+        "OverlayFS copy-on-write storage layers",
+        "Linux file system permissions (chmod, chown, setuid)",
+        "shell piping & redirectional streams",
+        "bash scripting logic",
+        "networking utilities (netstat, lsof, dig)",
+        "SSH key authentication",
+        "git interactive rebase & reflog"
+      ],
+      "advanced": [
+        "CI/CD pipeline orchestration & caching",
+        "git rebase vs merge (interactive rebasing, reflog)",
+        "linux process scheduling & states",
+        "cron jobs & systemd service units",
+        "TCP TIME_WAIT reuse sockets",
+        "Blue-green vs Canary traffic routing strategies",
+        "infrastructure as code (Terraform principles)"
+      ],
+      "elite": [
+        "Linux namespaces (PID, Mount, Net, User) isolation boundaries",
+        "control groups (cgroups v1 vs v2) resource scheduling",
+        "Linux socket buffers & NAPI polling",
+        "eBPF program hooks & XDP (eXpress Data Path)",
+        "Linux context switching overhead & syscalls via vDSO",
+        "page cache eviction & dirty pages syncing",
+        "swap space thrashing & OOM killer scoring",
+        "epoll vs select vs poll kernel event queues",
+        "Kubernetes controller manager reconciliation loop mechanics"
+      ]
+    }
+  },
+  "6": {
+    "category": "Tech History & Riddles",
+    "seeds": {
+      "intermediate": [
+        "famous computer scientists (Turing, Shannon, Hopper)",
+        "classic logic & algorithmic riddles",
+        "evolution of programming languages (Fortran, Lisp, C)",
+        "history of the Internet & ARPANET"
+      ],
+      "advanced": [
+        "historic software bugs (Y2K, Knight Capital, Ariane 5)",
+        "RSA decryption mathematics (Euler's totient, modular exponentiation)",
+        "Turing machines & computability",
+        "CPU architecture history (x86 vs ARM)",
+        "open-source software movement landmarks"
+      ],
+      "elite": [
+        "Byzantine Generals Problem consensus bounds",
+        "Turing halting problem proof",
+        "Claude Shannon information theory entropy",
+        "Alan Turing universal machines",
+        "Grace Hopper compiler design landmarks",
+        "ECC cryptography (ECDSA, Ed25519) Weierstrass curves",
+        "Zero-Knowledge Proofs (zk-SNARKs vs zk-STARKs)",
+        "classic logic riddles (Muddy Children puzzle logic)"
+      ]
+    }
+  }
+}
