@@ -381,15 +381,41 @@ class handler(BaseHTTPRequestHandler):
         is_start_cmd = command_text.lower().startswith("/start")
 
         # If user is not allowed and runs /start, record their ID as inactive for admins to approve later
+        was_registered = False
         if not is_allowed and user_id is not None and is_start_cmd:
-            register_inactive_user_if_new(user_id, username)
+            was_registered = register_inactive_user_if_new(user_id, username)
 
         if not is_allowed:
             logger.warning(f"Unauthorized access attempt by user_id: {user_id}, username: {username}")
+            
+            from src.config import ADMIN_USER_IDS, TELEGRAM_ADMIN_USERNAME
+            
+            # Send notification to admins if they just registered as inactive
+            if was_registered:
+                user_label = f"@{username}" if username else f"User ID {user_id}"
+                admin_msg = (
+                    f"🔔 <b>New Access Request</b>\n\n"
+                    f"User {user_label} (ID: <code>{user_id}</code>) is requesting access to the daily quiz bot.\n\n"
+                    f"To grant access, send:\n"
+                    f"<code>/allow {user_id}</code>"
+                )
+                for admin_id in ADMIN_USER_IDS:
+                    try:
+                        send_message(admin_id, admin_msg)
+                    except Exception as ex:
+                        logger.error(f"Failed to send access request notification to admin {admin_id}: {ex}")
+
+            admin_contact = ""
+            if TELEGRAM_ADMIN_USERNAME:
+                contact_handle = TELEGRAM_ADMIN_USERNAME.strip()
+                if not contact_handle.startswith("@"):
+                    contact_handle = "@" + contact_handle
+                admin_contact = f" ({contact_handle})"
+
             response_text = (
                 f"⚠️ <b>Access Denied</b>\n\n"
-                f"You are not authorized to use this bot. Please contact the administrator with your "
-                f"User ID: <code>{user_id}</code>"
+                f"You are not authorized to use this bot. Please contact the administrator{admin_contact} with your "
+                f"User ID: <code>{user_id}</code> to request access."
             )
             if chat_id:
                 try:

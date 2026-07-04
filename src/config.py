@@ -27,3 +27,6 @@ for uid in raw_admins.split(","):
 
 # Quiz Format Configuration: 'poll' (native) or 'inline' (message + buttons)
 QUIZ_FORMAT = os.getenv("QUIZ_FORMAT", "poll").strip().lower()
+
+# Admin Username for Access Requests (e.g. @your_username)
+TELEGRAM_ADMIN_USERNAME = os.getenv("TELEGRAM_ADMIN_USERNAME", "").strip()
