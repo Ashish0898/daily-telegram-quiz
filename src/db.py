@@ -6,6 +6,8 @@ from src.utils import log_step
 
 logger = logging.getLogger("db")
 
+BOT_NAME = "quiz"
+
 _client = None
 
 def get_supabase_client() -> Client:
@@ -96,7 +98,7 @@ def save_quiz_to_history(
 
 @log_step(logger)
 def is_user_allowed(user_id: int) -> bool:
-    """Check if a Telegram user ID is present and active in Supabase allowed_users."""
+    """Check if a Telegram user ID is present and active in Supabase user_bot_access for this bot."""
     if user_id in ADMIN_USER_IDS:
         logger.info(f"User {user_id} is in config ADMIN_USER_IDS. Access allowed.")
         return True
@@ -107,15 +109,15 @@ def is_user_allowed(user_id: int) -> bool:
         return len(ADMIN_USER_IDS) == 0 or user_id in ADMIN_USER_IDS
 
     try:
-        response = client.table("allowed_users").select("is_active").eq("user_id", user_id).execute()
+        response = client.table("user_bot_access").select("is_active").eq("user_id", user_id).eq("bot_name", BOT_NAME).execute()
         if response.data and len(response.data) > 0:
             active = response.data[0].get("is_active", True)
-            logger.info(f"DB allowlist lookup result for {user_id}: active={active}")
+            logger.info(f"DB allowlist lookup result for {user_id} on {BOT_NAME}: active={active}")
             return active
-        logger.info(f"User {user_id} not found in DB allowlist.")
+        logger.info(f"User {user_id} not found in DB allowlist for bot {BOT_NAME}.")
         return False
     except Exception as e:
-        logger.warning(f"Could not query 'allowed_users' in Supabase: {e}. Falling back to admin config check.")
+        logger.warning(f"Could not query 'user_bot_access' in Supabase: {e}. Falling back to admin config check.")
         return user_id in ADMIN_USER_IDS
 
 @log_step(logger)
@@ -140,35 +142,47 @@ def is_user_admin(user_id: int) -> bool:
 
 @log_step(logger)
 def allow_user(user_id: int, username: str = None, role: str = "regular") -> tuple[bool, str | None]:
-    """Upsert an allowed user in Supabase allowed_users."""
+    """Upsert an allowed user profile, and activate bot access in user_bot_access."""
     client = get_supabase_client()
     if not client:
         return False, "Database connection not available"
 
-    payload = {
+    user_payload = {
         "user_id": user_id,
-        "role": role,
-        "is_active": True
+        "role": role
     }
     if username:
-        payload["username"] = username.lstrip('@')
+        user_payload["username"] = username.lstrip('@')
+
+    access_payload = {
+        "user_id": user_id,
+        "bot_name": BOT_NAME,
+        "is_active": True
+    }
 
     try:
-        client.table("allowed_users").upsert(payload).execute()
+        # Upsert the user profile first
+        client.table("allowed_users").upsert(user_payload).execute()
+        # Upsert the bot access record next
+        client.table("user_bot_access").upsert(access_payload).execute()
         return True, None
     except Exception as e:
-        logger.exception(f"Failed to allow user {user_id}")
+        logger.exception(f"Failed to allow user {user_id} for bot {BOT_NAME}")
         return False, str(e)
 
 @log_step(logger)
 def revoke_user(user_id: int) -> tuple[bool, str | None]:
-    """Deactivate a user in the 'allowed_users' table."""
+    """Deactivate a user's bot access in user_bot_access table."""
     client = get_supabase_client()
     if not client:
         return False, "Database connection not available"
 
     try:
-        client.table("allowed_users").update({"is_active": False}).eq("user_id", user_id).execute()
+        client.table("user_bot_access").upsert({
+            "user_id": user_id,
+            "bot_name": BOT_NAME,
+            "is_active": False
+        }).execute()
         return True, None
     except Exception as e:
         logger.exception(f"Failed to revoke user {user_id}")
@@ -176,29 +190,39 @@ def revoke_user(user_id: int) -> tuple[bool, str | None]:
 
 @log_step(logger)
 def register_inactive_user_if_new(user_id: int, username: str = None) -> bool:
-    """Register a new user in database as inactive, awaiting authorization."""
+    """Register a new bot access in user_bot_access table as inactive."""
     client = get_supabase_client()
     if not client:
         return False
 
     try:
-        response = client.table("allowed_users").select("user_id").eq("user_id", user_id).execute()
+        # Check if they already have access record for this bot
+        response = client.table("user_bot_access").select("user_id").eq("user_id", user_id).eq("bot_name", BOT_NAME).execute()
         if response.data and len(response.data) > 0:
             return False
 
-        payload = {
+        # Upsert allowed_users profile first
+        user_payload = {
             "user_id": user_id,
-            "is_active": False,
-            "role": "regular"
+            "role": "regular",
+            "is_active": False
         }
         if username:
-            payload["username"] = username.lstrip('@')
+            user_payload["username"] = username.lstrip('@')
+        client.table("allowed_users").upsert(user_payload).execute()
 
-        client.table("allowed_users").insert(payload).execute()
-        logger.info(f"Registered new inactive user: {user_id} (username: {username})")
+
+        # Insert inactive access record for this bot
+        payload = {
+            "user_id": user_id,
+            "bot_name": BOT_NAME,
+            "is_active": False
+        }
+        client.table("user_bot_access").insert(payload).execute()
+        logger.info(f"Registered new inactive user access: {user_id} (bot: {BOT_NAME})")
         return True
     except Exception as e:
-        logger.exception(f"Failed to register inactive user {user_id}")
+        logger.exception(f"Failed to register inactive user access for {user_id} on {BOT_NAME}")
         return False
 
 @log_step(logger)
