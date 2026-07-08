@@ -47,7 +47,8 @@ from src.db import (
     revoke_user,
     register_inactive_user_if_new,
     resolve_user_details,
-    get_all_users
+    get_all_users,
+    get_admin_user_ids
 )
 
 def parse_command(text: str) -> dict:
@@ -378,17 +379,21 @@ class handler(BaseHTTPRequestHandler):
         if not is_allowed and chat_id is not None:
             is_allowed = is_user_allowed(chat_id)
 
+        logger.info(f"Authorization check result: is_allowed={is_allowed} for user_id={user_id}, chat_id={chat_id}")
+
         is_start_cmd = command_text.lower().startswith("/start")
 
         # If user is not allowed and runs /start, record their ID as inactive for admins to approve later
         was_registered = False
         if not is_allowed and user_id is not None and is_start_cmd:
+            logger.info(f"User {user_id} is not allowed and ran /start. Registering inactive...")
             was_registered = register_inactive_user_if_new(user_id, username)
+            logger.info(f"Registration result: was_registered={was_registered}")
 
         if not is_allowed:
             logger.warning(f"Unauthorized access attempt by user_id: {user_id}, username: {username}")
             
-            from src.config import ADMIN_USER_IDS, TELEGRAM_ADMIN_USERNAME
+            from src.config import TELEGRAM_ADMIN_USERNAME
             
             # Send notification to admins if they just registered as inactive
             if was_registered:
@@ -399,9 +404,13 @@ class handler(BaseHTTPRequestHandler):
                     f"To grant access, send:\n"
                     f"<code>/allow {user_id}</code>"
                 )
-                for admin_id in ADMIN_USER_IDS:
+                admin_ids = get_admin_user_ids()
+                logger.info(f"Admins to notify: {admin_ids}")
+                for admin_id in admin_ids:
                     try:
+                        logger.info(f"Attempting to send access request notification to admin {admin_id}...")
                         send_message(admin_id, admin_msg)
+                        logger.info(f"Successfully notified admin {admin_id}.")
                     except Exception as ex:
                         logger.error(f"Failed to send access request notification to admin {admin_id}: {ex}")
 

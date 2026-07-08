@@ -140,6 +140,31 @@ def is_user_admin(user_id: int) -> bool:
         logger.error(f"Failed to check admin status: {e}")
         return False
 
+
+@log_step(logger)
+def get_admin_user_ids() -> list[int]:
+    """
+    Retrieves all Telegram user IDs of active admins from the database.
+    Also falls back to the config ADMIN_USER_IDS if none are found in the database.
+    """
+    admin_ids = []
+    client = get_supabase_client()
+    if client:
+        try:
+            response = client.table("allowed_users").select("user_id").eq("role", "admin").execute()
+            if response.data:
+                for row in response.data:
+                    uid = row.get("user_id")
+                    if uid:
+                        admin_ids.append(int(uid))
+        except Exception as e:
+            logger.warning(f"Could not query database for admin user IDs: {e}")
+
+    # Fallback to config admin IDs if database query failed or returned none
+    if not admin_ids:
+        admin_ids = ADMIN_USER_IDS
+    return list(set(admin_ids))
+
 @log_step(logger)
 def allow_user(user_id: int, username: str = None, role: str = "regular") -> tuple[bool, str | None]:
     """Upsert an allowed user profile, and activate bot access in user_bot_access."""
