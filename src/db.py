@@ -204,11 +204,13 @@ def register_inactive_user_if_new(user_id: int, username: str = None) -> bool:
         # Upsert allowed_users profile first
         user_payload = {
             "user_id": user_id,
-            "role": "regular"
+            "role": "regular",
+            "is_active": False
         }
         if username:
             user_payload["username"] = username.lstrip('@')
         client.table("allowed_users").upsert(user_payload).execute()
+
 
         # Insert inactive access record for this bot
         payload = {
