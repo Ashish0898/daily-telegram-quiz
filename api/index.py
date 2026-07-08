@@ -570,12 +570,21 @@ class handler(BaseHTTPRequestHandler):
                         success, err = allow_user(target_uid, target_uname, role)
                         if success:
                             response_text = f"✅ User <code>{target_uid}</code> ({target_uname or 'Unknown'}) successfully allowed as <b>{role}</b>."
+                            try:
+                                user_notify_msg = (
+                                    "🎉 <b>Access Granted</b>\n\n"
+                                    "You have been authorized to use the daily quiz bot. "
+                                    "Send /start to get started!"
+                                )
+                                send_message(target_uid, user_notify_msg)
+                            except Exception as ex:
+                                logger.error(f"Failed to send access granted notification to user {target_uid}: {ex}")
                         else:
                             response_text = f"❌ Failed to allow user: {err}"
                 
                 send_message(chat_id, response_text)
                 topic = "allow_user"
-
+ 
             elif cmd_type == "revoke":
                 if not is_admin:
                     response_text = "⚠️ <b>Permission Denied</b>: This command is restricted to administrators."
@@ -588,6 +597,14 @@ class handler(BaseHTTPRequestHandler):
                         success, err = revoke_user(target_uid)
                         if success:
                             response_text = f"✅ Access revoked for user <code>{target_uid}</code> ({target_uname or 'Unknown'})."
+                            try:
+                                user_notify_msg = (
+                                    "🚫 <b>Access Revoked</b>\n\n"
+                                    "Your access to the daily quiz bot has been revoked by the administrator."
+                                )
+                                send_message(target_uid, user_notify_msg)
+                            except Exception as ex:
+                                logger.error(f"Failed to send access revoked notification to user {target_uid}: {ex}")
                         else:
                             response_text = f"❌ Failed to revoke user: {err}"
                 
