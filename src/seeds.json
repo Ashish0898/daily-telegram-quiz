@@ -3,40 +3,37 @@
     "category": "Data Structures",
     "seeds": {
       "easy": [
-        "arrays",
-        "array list lookup time complexity",
-        "queue FIFO concept",
-        "stack LIFO concept",
-        "string manipulation",
-        "binary search tree definition",
-        "node definition"
+        "arrays and lists",
+        "hash tables and dictionary lookups",
+        "stack vs queue",
+        "linked list basics",
+        "string operations",
+        "tree basics",
+        "graph basics"
       ],
       "intermediate": [
-        "singly/doubly linked lists",
-        "dynamic arrays (amortized O(1))",
-        "binary search trees (BST insertion/deletion)",
-        "binary/binomial heaps",
-        "Bloom filters",
-        "ring buffers",
-        "sparse tables"
+        "hash maps and collision handling",
+        "priority queues and heaps",
+        "tries and prefix trees",
+        "circular buffers",
+        "LRU cache design",
+        "tree traversals",
+        "graphs and adjacency lists"
       ],
       "advanced": [
-        "Log-Structured Merge (LSM) Trees & SS-Tables",
-        "Skip Lists",
-        "B+ Trees database page layout",
-        "splay trees & self-adjusting heuristics",
+        "balanced BSTs and B-trees",
+        "red-black trees and AVL trees",
+        "skip lists and Bloom filters",
         "segment trees with lazy propagation",
-        "Fenwick trees (binary indexed trees)",
-        "Bloom and Cuckoo filters (false positive rates)",
-        "quadtrees & R-trees spatial indexing"
+        "disjoint set union",
+        "suffix arrays and tries"
       ],
       "elite": [
-        "lock-free/wait-free concurrent structures (hazard pointers, epoch-based reclamation)",
-        "cuckoo hashing & Robin Hood hashing collision heuristics",
-        "HyperLogLog cardinality estimation",
-        "Merkle trees & distributed state verification",
-        "persistent/immutable data structures",
-        "cache-oblivious algorithms layout"
+        "lock-free concurrent data structures",
+        "persistent data structures",
+        "Merkle trees for AI data integrity",
+        "cache-aware data layout",
+        "Cuckoo hashing and Robin Hood hashing"
       ]
     }
   },
@@ -44,43 +41,37 @@
     "category": "Algorithms & Complexity",
     "seeds": {
       "easy": [
-        "constant time O(1) definition",
-        "linear time O(N) definition",
-        "bubble sort mechanics",
-        "linear search vs binary search",
-        "recursion base case",
-        "nested loops complexity"
+        "Big O notation",
+        "time vs space complexity",
+        "linear vs binary search",
+        "recursion and base cases",
+        "sorting basics",
+        "greedy vs dynamic programming"
       ],
       "intermediate": [
-        "Big O amortized time/space complexity",
-        "recursive backtracking",
-        "sliding window optimization",
-        "two-pointers (slow/fast)",
-        "Dijkstra and A* pathfinding",
-        "depth-first vs breadth-first search",
-        "Topological Sort",
-        "divide-and-conquer master theorem limits"
+        "two pointers",
+        "sliding window",
+        "backtracking",
+        "memoization vs tabulation",
+        "Dijkstra and A*",
+        "DFS vs BFS",
+        "topological sort"
       ],
       "advanced": [
-        "stable vs unstable sort hardware cache locality (quicksort vs mergesort)",
-        "binary search boundaries",
-        "Kruskal/Prim minimum spanning tree",
-        "Knuth-Morris-Pratt failure functions",
-        "Johnson's all-pairs shortest paths",
-        "Knuth DP optimization",
-        "Convex Hull Trick"
+        "Kruskal and Prim minimum spanning trees",
+        "Knuth-Morris-Pratt pattern matching",
+        "binary search on answer",
+        "dynamic programming optimization",
+        "network flow basics",
+        "divide-and-conquer patterns"
       ],
       "elite": [
-        "potential method amortized analysis",
-        "Tarjan strongly connected components",
-        "Edmonds-Karp & Dinic maximum flow",
-        "bipartite matching",
-        "digit dynamic programming",
-        "dynamic programming bitmasking state compression",
-        "Aho-Corasick string matching automaton",
-        "suffix automata & suffix arrays",
-        "Heavy-Light Decomposition (HLD) on trees",
-        "P vs NP-complete reductions & approximation algorithms"
+        "maximum flow and matching",
+        "strongly connected components",
+        "suffix automata and arrays",
+        "approximation algorithms",
+        "amortized analysis",
+        "algorithmic trade-offs in inference systems"
       ]
     }
   },
@@ -88,40 +79,36 @@
     "category": "Databases & SQL",
     "seeds": {
       "easy": [
-        "primary key definition",
-        "foreign key definition",
-        "SELECT query syntax",
-        "WHERE clause filtering",
-        "index definition",
-        "database tables",
-        "relational vs non-relational definition"
+        "primary and foreign keys",
+        "SELECT / WHERE / GROUP BY",
+        "joins and their trade-offs",
+        "indexes and their purpose",
+        "normalization basics",
+        "transactions basics"
       ],
       "intermediate": [
-        "SQL joins & outer join nuances",
-        "ACID properties (Write-Ahead Logging)",
-        "master-slave vs multi-master replication",
-        "NoSQL trade-offs (CAP theorem, PACELC)",
-        "database normalization vs denormalization",
-        "connection pooling",
-        "database views & materialized views"
+        "ACID and isolation levels",
+        "query plans and EXPLAIN",
+        "replication and sharding",
+        "denormalization trade-offs",
+        "materialized views",
+        "connection pooling"
       ],
       "advanced": [
-        "B-Tree and LSM-Tree indexing",
-        "database execution plans & scan types",
-        "transaction isolation levels (phantom reads vs write skew)",
-        "LSM-tree size-tiered vs leveled compaction",
-        "database cost-based optimizer (CBO) join ordering (System R dynamic programming)",
-        "consistent hashing with virtual nodes"
+        "B-tree vs LSM indexing",
+        "MVCC and write skew",
+        "locking and deadlocks",
+        "partitioning and clustering",
+        "cost-based optimization",
+        "vector search data stores"
       ],
       "elite": [
-        "multi-version concurrency control (MVCC) rollback segments",
-        "writeskew anomalies under snapshot isolation",
-        "write-ahead logging (WAL) ARIES recovery algorithm",
-        "InnoDB doublewrite buffering",
-        "Google Spanner TrueTime commit wait consensus",
-        "Google Percolator 2-phase lock (2PL) with MVCC",
-        "distributed consensus (Paxos vs Raft)",
-        "distributed transactions (2PC vs 3PC vs Saga pattern)"
+        "distributed transactions and consensus",
+        "WAL and ARIES recovery",
+        "multi-region replication",
+        "Paxos vs Raft",
+        "2PC vs 3PC vs Saga",
+        "vector databases at scale"
       ]
     }
   },
@@ -130,37 +117,35 @@
     "seeds": {
       "easy": [
         "client-server model",
-        "DNS purpose",
-        "HTTP status codes (200, 404, 500)",
-        "load balancer definition",
-        "database replication concept",
-        "API definition"
+        "DNS and HTTP",
+        "load balancers",
+        "caching basics",
+        "database replication",
+        "APIs and idempotency"
       ],
       "intermediate": [
-        "DNS resolution flow",
-        "UDP vs TCP use cases",
-        "CDN edge caching",
-        "microservices service discovery",
-        "API gateway routing",
-        "load balancing algorithms (round-robin)"
+        "CDNs and cache invalidation",
+        "load balancing strategies",
+        "service discovery",
+        "API gateways",
+        "rate limiting",
+        "queues and event-driven design"
       ],
       "advanced": [
-        "gossip protocols & anti-entropy replication",
-        "Kafka partition rebalancing & log compaction",
-        "token bucket vs leaky bucket rate limiting",
-        "circuit breaker state transitions",
-        "CAP vs PACELC theorems tradeoffs",
-        "CDN edge cache invalidation consistency models",
-        "microservices service mesh sidecars (Envoy)"
+        "CAP and PACELC",
+        "message queues and partitioning",
+        "circuit breakers and retries",
+        "backpressure and load shedding",
+        "consistency models",
+        "LLM service orchestration"
       ],
       "elite": [
-        "Dynamo sloppy quorums & hinted handoff & read repair",
-        "vector clocks vs lamport timestamps",
-        "Kafka exactly-once semantics (transactional producers)",
-        "GC-aware rate limiting",
-        "backpressure propagation & load shedding",
-        "multi-region active-active split-brain mitigation",
-        "TCP handshake & congestion control algorithms (BBR vs Cubic)"
+        "multi-region active-active design",
+        "eventual consistency and vector clocks",
+        "exactly-once semantics",
+        "leader election",
+        "observability and SLOs",
+        "resilient AI product architecture"
       ]
     }
   },
@@ -169,36 +154,35 @@
     "seeds": {
       "easy": [
         "lists vs tuples",
-        "dictionary key-value access",
-        "variable scope",
-        "local vs global variables",
-        "basic function definition",
+        "dictionaries and hashing",
+        "functions and scopes",
+        "exceptions and debugging",
         "list comprehensions",
-        "print formatting"
+        "classes and objects"
       ],
       "intermediate": [
-        "iterator and generator protocols",
-        "decorators (wrappers, closures)",
-        "context managers (__enter__/__exit__)",
-        "__slots__ memory layout implications",
-        "typing & type annotations",
-        "namespace lookup LEGB resolution mechanics"
+        "iterators and generators",
+        "decorators and closures",
+        "context managers",
+        "typing and dataclasses",
+        "memory management and __slots__",
+        "module packaging"
       ],
       "advanced": [
-        "async/await event loop mechanics",
-        "descriptor protocol (__get__/__set__/__delete__) custom descriptors",
-        "metaclasses & custom class construction (__new__ vs __init__)",
-        "method resolution order (C3 linearization algorithm)",
-        "Python C API & PyBind11 bindings",
-        "memoryviews & buffer protocol high-performance arrays"
+        "async/await and event loops",
+        "descriptors",
+        "metaclasses",
+        "MRO and C3 linearization",
+        "memoryviews and buffers",
+        "multiprocessing vs threading"
       ],
       "elite": [
-        "CPython bytecode evaluation loop (ceval.c) opcodes",
-        "PyMalloc block/pool/arena allocator hierarchy",
-        "generational cyclic garbage collection thresholds",
-        "GIL release signaling & OS thread interactions",
-        "asyncio event loop selectors (epoll/kqueue) integration",
-        "coroutine generator suspension state objects"
+        "CPython internals and bytecode",
+        "GIL and concurrency",
+        "garbage collection",
+        "coroutines and scheduler internals",
+        "C extensions and PyBind11",
+        "Python for AI service performance"
       ]
     }
   },
@@ -206,76 +190,72 @@
     "category": "DevOps, Git & Linux",
     "seeds": {
       "easy": [
-        "git clone",
-        "git add",
-        "git commit",
-        "git push",
-        "git pull",
-        "basic linux directory commands (ls, cd, pwd)",
-        "docker container definition"
+        "version control fundamentals",
+        "common git workflows",
+        "branching and merging",
+        "Linux basics",
+        "containers and images"
       ],
       "intermediate": [
-        "OverlayFS copy-on-write storage layers",
-        "Linux file system permissions (chmod, chown, setuid)",
-        "shell piping & redirectional streams",
-        "bash scripting logic",
-        "networking utilities (netstat, lsof, dig)",
-        "SSH key authentication",
-        "git interactive rebase & reflog"
+        "CI/CD concepts",
+        "shell scripting",
+        "permissions and ownership",
+        "networking basics",
+        "SSH and secrets",
+        "observability basics"
       ],
       "advanced": [
-        "CI/CD pipeline orchestration & caching",
-        "git rebase vs merge (interactive rebasing, reflog)",
-        "linux process scheduling & states",
-        "cron jobs & systemd service units",
-        "TCP TIME_WAIT reuse sockets",
-        "Blue-green vs Canary traffic routing strategies",
-        "infrastructure as code (Terraform principles)"
+        "infrastructure as code",
+        "git rebase vs merge",
+        "process scheduling",
+        "systemd and cron",
+        "load balancing and reverse proxies",
+        "container orchestration"
       ],
       "elite": [
-        "Linux namespaces (PID, Mount, Net, User) isolation boundaries",
-        "control groups (cgroups v1 vs v2) resource scheduling",
-        "Linux socket buffers & NAPI polling",
-        "eBPF program hooks & XDP (eXpress Data Path)",
-        "Linux context switching overhead & syscalls via vDSO",
-        "page cache eviction & dirty pages syncing",
-        "swap space thrashing & OOM killer scoring",
-        "epoll vs select vs poll kernel event queues",
-        "Kubernetes controller manager reconciliation loop mechanics"
+        "Linux namespaces and cgroups",
+        "eBPF and XDP",
+        "kernel networking",
+        "caching and storage internals",
+        "Kubernetes control loops",
+        "deploying AI services reliably"
       ]
     }
   },
   "6": {
-    "category": "Tech History & Riddles",
+    "category": "AI, LLMs & Agents",
     "seeds": {
       "easy": [
-        "inventor of Python",
-        "inventor of the World Wide Web",
-        "basic binary arithmetic",
-        "classic riddles (crossing river with wolf/goat/cabbage)"
+        "what is an LLM",
+        "transformers basics",
+        "prompting fundamentals",
+        "RAG basics",
+        "AI agents basics",
+        "hallucination and grounding"
       ],
       "intermediate": [
-        "famous computer scientists (Turing, Shannon, Hopper)",
-        "classic logic & algorithmic riddles",
-        "evolution of programming languages (Fortran, Lisp, C)",
-        "history of the Internet & ARPANET"
+        "embeddings and vector search",
+        "context windows and tokenization",
+        "function calling and tool use",
+        "prompt engineering patterns",
+        "evaluation and benchmarking",
+        "retrieval pipelines"
       ],
       "advanced": [
-        "historic software bugs (Y2K, Knight Capital, Ariane 5)",
-        "RSA decryption mathematics (Euler's totient, modular exponentiation)",
-        "Turing machines & computability",
-        "CPU architecture history (x86 vs ARM)",
-        "open-source software movement landmarks"
+        "fine-tuning and RLHF",
+        "agent orchestration",
+        "chunking and retrieval quality",
+        "memory systems for agents",
+        "guardrails and safety",
+        "model serving trade-offs"
       ],
       "elite": [
-        "Byzantine Generals Problem consensus bounds",
-        "Turing halting problem proof",
-        "Claude Shannon information theory entropy",
-        "Alan Turing universal machines",
-        "Grace Hopper compiler design landmarks",
-        "ECC cryptography (ECDSA, Ed25519) Weierstrass curves",
-        "Zero-Knowledge Proofs (zk-SNARKs vs zk-STARKs)",
-        "classic logic riddles (Muddy Children puzzle logic)"
+        "multi-agent planning",
+        "speculative decoding",
+        "attention variants",
+        "MCP and tool interoperability",
+        "evaluation for production AI systems",
+        "LLM observability, latency, and cost"
       ]
     }
   }
