@@ -393,7 +393,7 @@ class handler(BaseHTTPRequestHandler):
         if not is_allowed:
             logger.warning(f"Unauthorized access attempt by user_id: {user_id}, username: {username}")
             
-            from src.config import TELEGRAM_ADMIN_USERNAME
+            from src.config import TELEGRAM_ADMIN_USERNAME, TELEGRAM_GROUP_LINK
             
             # Send notification to admins if they just registered as inactive
             if was_registered:
@@ -422,20 +422,32 @@ class handler(BaseHTTPRequestHandler):
                 admin_contact = f" ({contact_handle})"
 
             response_text = (
-                f"⚠️ <b>Access Denied</b>\n\n"
-                f"You are not authorized to use this bot. Please contact the administrator{admin_contact} with your "
-                f"User ID: <code>{user_id}</code> to request access."
+                f"👋 <b>Welcome!</b>\n\n"
+                f"Your request for access has been submitted to the admin for approval{admin_contact}. ⏳\n\n"
+                f"In the meantime, you are welcome to join our Telegram group to try out features and participate in daily quizzes with the community! 🚀\n\n"
+                f"<i>Your User ID: <code>{user_id}</code></i>"
             )
+
+            reply_markup = None
+            if TELEGRAM_GROUP_LINK:
+                reply_markup = {
+                    "inline_keyboard": [
+                        [
+                            {"text": "💬 Join Telegram Group", "url": TELEGRAM_GROUP_LINK}
+                        ]
+                    ]
+                }
+
             if chat_id:
                 try:
-                    send_message(chat_id, response_text)
+                    send_message(chat_id, response_text, reply_markup=reply_markup)
                 except Exception as e:
-                    logger.error(f"Failed to send Access Denied response: {e}")
+                    logger.error(f"Failed to send access request response: {e}")
 
             self.send_json(200, {"ok": True, "reason": "ignored_unauthorized_user"})
             log_request(
                 endpoint="webhook",
-                status="access_denied",
+                status="access_pending",
                 user_id=user_id,
                 username=username,
                 chat_id=chat_id,

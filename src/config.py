@@ -30,3 +30,7 @@ QUIZ_FORMAT = os.getenv("QUIZ_FORMAT", "poll").strip().lower()
 
 # Admin Username for Access Requests (e.g. @your_username)
 TELEGRAM_ADMIN_USERNAME = os.getenv("TELEGRAM_ADMIN_USERNAME", "").strip()
+
+# Telegram Group / Community Link for unauthorized users
+TELEGRAM_GROUP_LINK = os.getenv("TELEGRAM_GROUP_LINK", "").strip()
+

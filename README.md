@@ -49,7 +49,8 @@ Deploy this repository to Vercel and add these environment variables:
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role secret API key (bypasses RLS to write audit logs). |
 | `TELEGRAM_WEBHOOK_SECRET` | A secure, random string used to sign and verify incoming webhook requests from Telegram. |
 | `TELEGRAM_ADMIN_USER_IDS` | Comma-separated list of Telegram User IDs who have administrator roles. |
-| `TELEGRAM_ADMIN_USERNAME` | *Optional*: The Telegram handle of the main admin (e.g. `@username`), displayed to unauthorized users to request access. |
+| `TELEGRAM_ADMIN_USERNAME` | *Optional*: The Telegram handle of the main admin (e.g. `@username`), displayed to unauthorized users. |
+| `TELEGRAM_GROUP_LINK` | *Optional*: The Telegram community group URL (e.g. `https://t.me/your_group`), provided to pending access users so they can try out features. |
 
 ---
 
