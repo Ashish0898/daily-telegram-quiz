@@ -4,7 +4,7 @@ import requests
 import json
 import logging
 from datetime import datetime, timezone
-from config import GITHUB_ENDPOINT, GITHUB_TOKEN, MODEL_NAME
+from config import GEMINI_ENDPOINT, GEMINI_API_KEY, MODEL_NAME
 from utils import log_step
 
 logger = logging.getLogger("quiz_generator")
@@ -37,7 +37,7 @@ EXCLUDE_CLICHES = (
 @log_step(logger)
 def generate_quiz() -> dict:
     """
-    Call GitHub LLM to generate a single high-quality technical interview question.
+    Call Gemini LLM to generate a single high-quality technical interview question.
     Determines the category and topic automatically based on the current day of the week.
     Returns a dictionary matching the schema:
     {
@@ -48,8 +48,8 @@ def generate_quiz() -> dict:
       "category": str
     }
     """
-    if not GITHUB_TOKEN:
-        raise ValueError("GITHUB_TOKEN is not configured")
+    if not GEMINI_API_KEY:
+        raise ValueError("GEMINI_API_KEY is not configured")
 
     # Determine topic based on today's weekday
     weekday = datetime.now(timezone.utc).weekday()
@@ -129,29 +129,65 @@ def generate_quiz() -> dict:
         "}"
     )
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {GITHUB_TOKEN}"
-    }
-
     temperature = random.uniform(0.7, 1.0)
-    payload = {
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt}
-        ],
-        "temperature": temperature,
-        "model": MODEL_NAME
-    }
 
     try:
-        url = f"{GITHUB_ENDPOINT}/chat/completions"
-        logger.info(f"Sending request to GitHub LLM API (model: {MODEL_NAME})")
-        response = requests.post(url, headers=headers, json=payload, timeout=20)
-        response.raise_for_status()
-        
-        result_json = response.json()
-        raw_content = result_json["choices"][0]["message"]["content"].strip()
+        if "chat/completions" in GEMINI_ENDPOINT or "openai" in GEMINI_ENDPOINT:
+            # OpenAI-compatible API endpoint
+            url = GEMINI_ENDPOINT if GEMINI_ENDPOINT.startswith("http") else f"{GEMINI_ENDPOINT}/chat/completions"
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {GEMINI_API_KEY}"
+            }
+            payload = {
+                "model": MODEL_NAME,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                "temperature": temperature,
+                "response_format": {"type": "json_object"}
+            }
+            logger.info(f"Sending request to Gemini OpenAI-compatible API (model: {MODEL_NAME})")
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            result_json = response.json()
+            raw_content = result_json["choices"][0]["message"]["content"].strip()
+        else:
+            # Standard Google Gemini REST API endpoint
+            base_url = GEMINI_ENDPOINT.rstrip('/')
+            if not base_url.endswith('/models'):
+                base_url = f"{base_url}/models"
+            url = f"{base_url}/{MODEL_NAME}:generateContent?key={GEMINI_API_KEY}"
+            
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "systemInstruction": {
+                    "parts": [{"text": system_prompt}]
+                },
+                "contents": [
+                    {
+                        "role": "user",
+                        "parts": [{"text": user_prompt}]
+                    }
+                ],
+                "generationConfig": {
+                    "temperature": temperature,
+                    "responseMimeType": "application/json"
+                }
+            }
+            logger.info(f"Sending request to Google Gemini API (model: {MODEL_NAME})")
+            response = requests.post(url, headers=headers, json=payload, timeout=20)
+            response.raise_for_status()
+            result_json = response.json()
+            
+            candidates = result_json.get("candidates", [])
+            if not candidates:
+                raise ValueError("No candidates returned from Gemini API")
+            parts = candidates[0].get("content", {}).get("parts", [])
+            if not parts:
+                raise ValueError("No content parts returned from Gemini API")
+            raw_content = parts[0].get("text", "").strip()
         
         # Strip code block wrappers if any
         if raw_content.startswith("```"):

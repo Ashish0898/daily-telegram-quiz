@@ -1,6 +1,6 @@
 # ByteSize Brain Bot (`@ByteSizeBrainBot`)
 
-An interactive daily technical and logic trivia bot that generates high-quality multiple-choice questions using the GitHub LLM API (`openai/gpt-4.1-nano`) and delivers them to Telegram using native quiz polls.
+An interactive daily technical and logic trivia bot that generates high-quality multiple-choice questions using the Google Gemini API (`gemini-2.0-flash`) and delivers them to Telegram using native quiz polls.
 
 ---
 
@@ -44,7 +44,7 @@ Deploy this repository to Vercel and add these environment variables:
 | :--- | :--- |
 | `TELEGRAM_BOT_TOKEN` | Token received from @BotFather. |
 | `TELEGRAM_CHAT_ID` | The channel, group, or user chat ID where daily quizzes should be sent. |
-| `GITHUB_TOKEN` | Your GitHub token for access to the LLM Models API. |
+| `GEMINI_API_KEY` | Your Google Gemini API key (or `GEMINI_KEY`). |
 | `SUPABASE_URL` | Your Supabase Project API URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role secret API key (bypasses RLS to write audit logs). |
 | `TELEGRAM_WEBHOOK_SECRET` | A secure, random string used to sign and verify incoming webhook requests from Telegram. |
@@ -82,7 +82,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
    ```env
    TELEGRAM_BOT_TOKEN="your_bot_token"
    TELEGRAM_CHAT_ID="your_target_chat_id"
-   GITHUB_TOKEN="your_github_token"
+   GEMINI_API_KEY="your_gemini_api_key"
    SUPABASE_URL="your_supabase_url"
    SUPABASE_SERVICE_ROLE_KEY="your_supabase_key"
    TELEGRAM_ADMIN_USER_IDS="your_telegram_id"

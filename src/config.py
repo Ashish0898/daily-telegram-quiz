@@ -8,10 +8,10 @@ TELEGRAM_API = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"
 # Webhook Security Token
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET")
 
-# GitHub LLM Configuration
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
-GITHUB_ENDPOINT = "https://models.github.ai/inference"
-MODEL_NAME = os.getenv("MODEL_NAME", "openai/gpt-4.1-nano")
+# Gemini LLM Configuration
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GEMINI_KEY")
+GEMINI_ENDPOINT = os.getenv("GEMINI_ENDPOINT", "https://generativelanguage.googleapis.com/v1beta")
+MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 
 # Supabase Database Configuration
 SUPABASE_URL = os.getenv("SUPABASE_URL")
