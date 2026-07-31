@@ -45,6 +45,8 @@ Deploy this repository to Vercel and add these environment variables:
 | `TELEGRAM_BOT_TOKEN` | Token received from @BotFather. |
 | `TELEGRAM_CHAT_ID` | The channel, group, or user chat ID where daily quizzes should be sent. |
 | `GEMINI_API_KEY` | Your Google Gemini API key (or `GEMINI_KEY`). |
+| `OPENROUTER_API_KEY` | *Optional*: OpenRouter API key for LLM provider fallback. |
+| `GROQ_API_KEY` | *Optional*: Groq API key for fast Llama 3 / Mixtral fallback. |
 | `SUPABASE_URL` | Your Supabase Project API URL. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role secret API key (bypasses RLS to write audit logs). |
 | `TELEGRAM_WEBHOOK_SECRET` | A secure, random string used to sign and verify incoming webhook requests from Telegram. |

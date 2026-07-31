@@ -4,10 +4,70 @@ import requests
 import json
 import logging
 from datetime import datetime, timezone
-from config import GEMINI_ENDPOINT, GEMINI_API_KEY, MODEL_NAME
+from config import (
+    GEMINI_ENDPOINT, GEMINI_API_KEY, MODEL_NAME,
+    OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL,
+    GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL
+)
 from utils import log_step
 
 logger = logging.getLogger("quiz_generator")
+
+def _call_gemini_direct(api_key: str, model: str, system_prompt: str, user_prompt: str, temperature: float) -> str:
+    base_url = GEMINI_ENDPOINT.rstrip('/')
+    if not base_url.endswith('/models'):
+        base_url = f"{base_url}/models"
+    url = f"{base_url}/{model}:generateContent?key={api_key}"
+    
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": system_prompt}]
+        },
+        "contents": [
+            {
+                "role": "user",
+                "parts": [{"text": user_prompt}]
+            }
+        ],
+        "generationConfig": {
+            "temperature": temperature,
+            "responseMimeType": "application/json"
+        }
+    }
+    logger.info(f"Sending request to Google Gemini API (model: {model})")
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    response.raise_for_status()
+    result_json = response.json()
+    
+    candidates = result_json.get("candidates", [])
+    if not candidates:
+        raise ValueError("No candidates returned from Gemini API")
+    parts = candidates[0].get("content", {}).get("parts", [])
+    if not parts:
+        raise ValueError("No content parts returned from Gemini API")
+    return parts[0].get("text", "").strip()
+
+def _call_openai_compatible(endpoint: str, api_key: str, model: str, system_prompt: str, user_prompt: str, temperature: float, provider_name: str = "LLM") -> str:
+    url = endpoint if endpoint.startswith("http") else f"{endpoint}/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}"
+    }
+    payload = {
+        "model": model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt}
+        ],
+        "temperature": temperature,
+        "response_format": {"type": "json_object"}
+    }
+    logger.info(f"Sending request to {provider_name} API (model: {model})")
+    response = requests.post(url, headers=headers, json=payload, timeout=20)
+    response.raise_for_status()
+    result_json = response.json()
+    return result_json["choices"][0]["message"]["content"].strip()
 
 # Weekday theme mapping (0=Monday, 6=Sunday)
 # Weekday theme mapping (0=Monday, 6=Sunday), loaded dynamically from seeds.json
@@ -37,7 +97,7 @@ EXCLUDE_CLICHES = (
 @log_step(logger)
 def generate_quiz() -> dict:
     """
-    Call Gemini LLM to generate a single high-quality technical interview question.
+    Call LLM APIs (Gemini, OpenRouter, Groq with auto-fallback) to generate a single high-quality question.
     Determines the category and topic automatically based on the current day of the week.
     Returns a dictionary matching the schema:
     {
@@ -48,9 +108,6 @@ def generate_quiz() -> dict:
       "category": str
     }
     """
-    if not GEMINI_API_KEY:
-        raise ValueError("GEMINI_API_KEY is not configured")
-
     # Determine topic based on today's weekday
     weekday = datetime.now(timezone.utc).weekday()
     theme = THEME_SCHEDULE[weekday]
@@ -131,69 +188,58 @@ def generate_quiz() -> dict:
 
     temperature = random.uniform(0.7, 1.0)
 
+    # Multi-provider cascade fallback sequence
+    providers_to_try = []
+
+    # 1. OpenRouter (if configured)
+    if OPENROUTER_API_KEY:
+        providers_to_try.append(
+            ("OpenRouter", lambda: _call_openai_compatible(OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL, system_prompt, user_prompt, temperature, "OpenRouter"))
+        )
+
+    # 2. Gemini Direct (primary model)
+    if GEMINI_API_KEY:
+        providers_to_try.append(
+            ("Gemini Direct", lambda: _call_gemini_direct(GEMINI_API_KEY, MODEL_NAME, system_prompt, user_prompt, temperature))
+        )
+
+    # 3. Groq (if configured)
+    if GROQ_API_KEY:
+        providers_to_try.append(
+            ("Groq", lambda: _call_openai_compatible(GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, system_prompt, user_prompt, temperature, "Groq"))
+        )
+
+    # 4. Gemini Direct Lite Fallback
+    if GEMINI_API_KEY and MODEL_NAME != "gemini-2.0-flash-lite":
+        providers_to_try.append(
+            ("Gemini Flash-Lite", lambda: _call_gemini_direct(GEMINI_API_KEY, "gemini-2.0-flash-lite", system_prompt, user_prompt, temperature))
+        )
+
+    if not providers_to_try:
+        raise ValueError("No LLM API keys configured (GEMINI_API_KEY, OPENROUTER_API_KEY, or GROQ_API_KEY)")
+
+    raw_content = None
+    last_error = None
+
     try:
-        if "chat/completions" in GEMINI_ENDPOINT or "openai" in GEMINI_ENDPOINT:
-            # OpenAI-compatible API endpoint
-            url = GEMINI_ENDPOINT if GEMINI_ENDPOINT.startswith("http") else f"{GEMINI_ENDPOINT}/chat/completions"
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {GEMINI_API_KEY}"
-            }
-            payload = {
-                "model": MODEL_NAME,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                "temperature": temperature,
-                "response_format": {"type": "json_object"}
-            }
-            logger.info(f"Sending request to Gemini OpenAI-compatible API (model: {MODEL_NAME})")
-            response = requests.post(url, headers=headers, json=payload, timeout=20)
-            response.raise_for_status()
-            result_json = response.json()
-            raw_content = result_json["choices"][0]["message"]["content"].strip()
-        else:
-            # Standard Google Gemini REST API endpoint
-            base_url = GEMINI_ENDPOINT.rstrip('/')
-            if not base_url.endswith('/models'):
-                base_url = f"{base_url}/models"
-            url = f"{base_url}/{MODEL_NAME}:generateContent?key={GEMINI_API_KEY}"
-            
-            headers = {"Content-Type": "application/json"}
-            payload = {
-                "systemInstruction": {
-                    "parts": [{"text": system_prompt}]
-                },
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": user_prompt}]
-                    }
-                ],
-                "generationConfig": {
-                    "temperature": temperature,
-                    "responseMimeType": "application/json"
-                }
-            }
-            logger.info(f"Sending request to Google Gemini API (model: {MODEL_NAME})")
-            response = requests.post(url, headers=headers, json=payload, timeout=20)
-            response.raise_for_status()
-            result_json = response.json()
-            
-            candidates = result_json.get("candidates", [])
-            if not candidates:
-                raise ValueError("No candidates returned from Gemini API")
-            parts = candidates[0].get("content", {}).get("parts", [])
-            if not parts:
-                raise ValueError("No content parts returned from Gemini API")
-            raw_content = parts[0].get("text", "").strip()
-        
+        for provider_name, provider_fn in providers_to_try:
+            try:
+                raw_content = provider_fn()
+                if raw_content:
+                    logger.info(f"Successfully received response from provider '{provider_name}'")
+                    break
+            except Exception as err:
+                logger.warning(f"LLM Provider '{provider_name}' failed: {err}")
+                last_error = err
+
+        if not raw_content:
+            raise RuntimeError(f"All configured LLM providers failed. Last error: {last_error}")
+
         # Strip code block wrappers if any
         if raw_content.startswith("```"):
             raw_content = raw_content.strip("`").replace("json", "", 1).strip()
 
-        logger.info("Successfully received LLM response. Parsing JSON...")
+        logger.info("Parsing quiz JSON content...")
         quiz_data = json.loads(raw_content)
 
         # Validate structure
