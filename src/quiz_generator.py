@@ -210,9 +210,9 @@ def generate_quiz() -> dict:
         )
 
     # 4. Gemini Direct Lite Fallback
-    if GEMINI_API_KEY and MODEL_NAME != "gemini-2.0-flash-lite":
+    if GEMINI_API_KEY and MODEL_NAME != "gemini-3.5-flash-lite":
         providers_to_try.append(
-            ("Gemini Flash-Lite", lambda: _call_gemini_direct(GEMINI_API_KEY, "gemini-2.0-flash-lite", system_prompt, user_prompt, temperature))
+            ("Gemini Flash-Lite", lambda: _call_gemini_direct(GEMINI_API_KEY, "gemini-3.5-flash-lite", system_prompt, user_prompt, temperature))
         )
 
     if not providers_to_try:
