@@ -44,7 +44,7 @@ def send_poll(
         raise ValueError("TELEGRAM_BOT_TOKEN is not set")
 
     url = f"{TELEGRAM_API}/sendPoll"
-    
+
     # Enforce Telegram constraints (API will fail if exceeded)
     safe_question = question[:300] if len(question) > 300 else question
     safe_options = [opt[:100] for opt in options[:10]]
@@ -79,7 +79,7 @@ def send_chat_action(chat_id: int, action: str = "typing") -> None:
     """Send a chat action (like 'typing') to let users know the bot is thinking."""
     if not TELEGRAM_BOT_TOKEN:
         return
-    
+
     url = f"{TELEGRAM_API}/sendChatAction"
     payload = {
         "chat_id": chat_id,
