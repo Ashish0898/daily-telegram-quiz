@@ -174,21 +174,25 @@ class handler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def get_resolved_path(self) -> str:
-        # Prefer Vercel matched path or forwarded URI headers to handle rewrites correctly
-        matched_path = self.headers.get('x-matched-path') or self.headers.get('x-forwarded-uri')
-        if matched_path:
-            parsed_url = urlparse(matched_path)
-        else:
-            parsed_url = urlparse(self.path)
+        # Prefer Vercel forwarded URI or invoke path over internal rewrite matched path
+        raw_path = self.headers.get('x-forwarded-uri') or self.headers.get('x-invoke-path')
+        if not raw_path:
+            matched_path = self.headers.get('x-matched-path')
+            if matched_path and urlparse(matched_path).path.rstrip('/') not in ('/api/index.py', '/api/index', '/api'):
+                raw_path = matched_path
+            else:
+                raw_path = self.path
+
+        parsed_url = urlparse(raw_path)
         return parsed_url.path.rstrip('/')
 
     def do_POST(self):
         path = self.get_resolved_path()
 
-        if path in ('/api/telegram', '/api/index', '/api', '', '/api/index.py'):
-            self.handle_telegram_webhook()
-        elif path == '/api/quiz':
+        if path == '/api/quiz':
             self.handle_quiz_trigger()
+        elif path in ('/api/telegram', '/api/index', '/api', '', '/api/index.py'):
+            self.handle_telegram_webhook()
         else:
             self.send_json(404, {"error": f"Path {self.path} not found"})
 
@@ -231,7 +235,8 @@ class handler(BaseHTTPRequestHandler):
         elif path == '/api/quiz':
             self.handle_quiz_trigger()
         elif path == '/api/users':
-            parsed_url = urlparse(self.path)
+            raw_url = self.headers.get('x-forwarded-uri') or self.headers.get('x-invoke-path') or self.path
+            parsed_url = urlparse(raw_url)
             self.handle_users_get(parsed_url.query)
         else:
             self.send_json(404, {"error": f"Path {self.path} not found"})
@@ -678,9 +683,8 @@ class handler(BaseHTTPRequestHandler):
         # Default count for the scheduler is 3 quizzes per run, but can be overridden via query parameter
         count = 3
         try:
-            matched_path = self.headers.get('x-matched-path') or self.headers.get('x-forwarded-uri')
-            url_to_parse = matched_path if matched_path else self.path
-            parsed_url = urlparse(url_to_parse)
+            raw_url = self.headers.get('x-forwarded-uri') or self.headers.get('x-invoke-path') or self.path
+            parsed_url = urlparse(raw_url)
             query_params = parse_qs(parsed_url.query)
             count_str = query_params.get("count", [None])[0]
             if count_str:
@@ -693,12 +697,15 @@ class handler(BaseHTTPRequestHandler):
             # Fetch active allowed users to send the quiz to
             active_users = [u for u in get_all_users() if u.get("is_active")]
             
-            # Collect unique group chat IDs to send the quiz to (negative IDs)
+            # Collect unique chat IDs to send the quiz to (both individual user IDs and group IDs)
             target_ids = set()
             for user in active_users:
                 uid = user.get("user_id")
-                if uid and int(uid) < 0:
-                    target_ids.add(int(uid))
+                if uid is not None:
+                    try:
+                        target_ids.add(int(uid))
+                    except (ValueError, TypeError):
+                        pass
 
             # Also add the main TELEGRAM_CHAT_ID if configured
             if TELEGRAM_CHAT_ID:
