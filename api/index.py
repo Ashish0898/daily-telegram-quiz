@@ -35,7 +35,7 @@ if os.path.exists(env_path):
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
-from src.config import TELEGRAM_CHAT_ID, TELEGRAM_WEBHOOK_SECRET, QUIZ_FORMAT
+from src.config import TELEGRAM_WEBHOOK_SECRET, QUIZ_FORMAT
 from src.telegram_client import send_message, send_poll, send_chat_action, answer_callback_query
 from src.quiz_generator import generate_quiz
 from src.db import (
@@ -104,7 +104,7 @@ def build_help_message(is_admin: bool = False) -> str:
 def build_leaderboard_message() -> str:
     """Retrieve leaderboard data and format it beautifully as HTML for Telegram."""
     from src.db import get_leaderboard_data, get_last_quiz_results
-    
+
     # 1. Fetch last quiz champions
     last_quiz = get_last_quiz_results()
     champions_text = ""
@@ -324,13 +324,13 @@ class handler(BaseHTTPRequestHandler):
             user_id = user.get("id")
             username = user.get("username")
             option_ids = poll_answer.get("option_ids", [])
-            
+
             if option_ids and user_id is not None:
                 selected_option = option_ids[0]
                 logger.info(f"Received poll answer: user_id={user_id}, username={username}, poll_id={poll_id}, option_id={selected_option}")
                 from src.db import save_user_answer
                 save_user_answer(poll_id, user_id, username, selected_option)
-                
+
             self.send_json(200, {"ok": True})
             log_request(
                 endpoint="webhook",
@@ -350,41 +350,41 @@ class handler(BaseHTTPRequestHandler):
             user_id = user.get("id")
             username = user.get("username")
             data = callback_query.get("data", "")
-            
+
             if data.startswith("qa:"):
                 parts = data.split(":")
                 if len(parts) == 4:
                     selected = int(parts[1])
                     correct = int(parts[2])
                     quiz_id = int(parts[3])
-                    
+
                     # Check if user already answered this quiz
                     from src.db import has_user_answered
                     if has_user_answered(quiz_id, user_id):
                         answer_callback_query(cb_id, "⚠️ You have already answered this quiz! Only your first attempt is registered.", show_alert=True)
                         self.send_json(200, {"ok": True})
                         return
-                    
+
                     is_correct = (selected == correct)
-                    
+
                     # Save inline answer to database
                     from src.db import save_user_inline_answer
                     save_user_inline_answer(quiz_id, user_id, username, selected, is_correct)
-                    
+
                     # Look up the explanation from quiz history if available
                     from src.db import get_quiz_explanation
                     explanation = get_quiz_explanation(quiz_id)
-                    
+
                     emoji = "✅ Correct!" if is_correct else "❌ Incorrect!"
                     alert_text = f"{emoji}\n\n"
                     if explanation:
                         alert_text += explanation
                     else:
                         alert_text += f"The correct answer was option {chr(65 + correct)}."
-                        
+
                     # Send flash alert popup to user
                     answer_callback_query(cb_id, alert_text, show_alert=True)
-                    
+
             self.send_json(200, {"ok": True})
             log_request(
                 endpoint="webhook",
@@ -405,7 +405,7 @@ class handler(BaseHTTPRequestHandler):
         from_user = message.get("from", {})
         user_id = from_user.get("id")
         username = from_user.get("username")
-        
+
         chat = message.get("chat", {})
         chat_id = chat.get("id")
         command_text = message.get("text", "").strip()
@@ -430,9 +430,9 @@ class handler(BaseHTTPRequestHandler):
 
         if not is_allowed:
             logger.warning(f"Unauthorized access attempt by user_id: {user_id}, username: {username}")
-            
+
             from src.config import TELEGRAM_ADMIN_USERNAME, TELEGRAM_GROUP_LINK
-            
+
             # Send notification to admins if they just registered as inactive
             if was_registered:
                 user_label = f"@{username}" if username else f"User ID {user_id}"
@@ -520,12 +520,12 @@ class handler(BaseHTTPRequestHandler):
 
                 quizzes_sent = []
                 last_category = "general"
-                
+
                 for i in range(count):
                     send_chat_action(chat_id, "upload_document")
                     quiz_data = generate_quiz()
                     last_category = quiz_data.get("category", "general")
-                    
+
                     # Save quiz to history first to get the database row ID
                     quiz_id = save_quiz_to_history(
                         question=quiz_data["question"],
@@ -535,7 +535,7 @@ class handler(BaseHTTPRequestHandler):
                         category=quiz_data["category"],
                         poll_id=None
                     )
-                    
+
                     if QUIZ_FORMAT == "inline":
                         text = (
                             f"🧠 <b>Daily Technical Trivia</b>\n"
@@ -572,13 +572,13 @@ class handler(BaseHTTPRequestHandler):
                             explanation=quiz_data["explanation"],
                             is_anonymous=False # Not anonymous, lets them see who voted
                         )
-                        
+
                         if poll_resp:
                             poll_id = poll_resp.get("result", {}).get("poll", {}).get("id")
                             if poll_id and quiz_id:
                                 from src.db import save_poll_mapping
                                 save_poll_mapping(poll_id, quiz_id)
-                                
+
                                 try:
                                     from src.db import get_supabase_client
                                     client = get_supabase_client()
@@ -586,9 +586,9 @@ class handler(BaseHTTPRequestHandler):
                                         client.table("quiz_history").update({"poll_id": poll_id}).eq("id", quiz_id).execute()
                                 except Exception as e:
                                     logger.error(f"Failed to update poll_id in history: {e}")
-                    
+
                     quizzes_sent.append(quiz_data["question"])
-                    
+
                     # Add a small delay between sending multiple quizzes
                     if i < count - 1:
                         time.sleep(0.5)
@@ -631,10 +631,10 @@ class handler(BaseHTTPRequestHandler):
                                 logger.error(f"Failed to send access granted notification to user {target_uid}: {ex}")
                         else:
                             response_text = f"❌ Failed to allow user: {err}"
-                
+
                 send_message(chat_id, response_text)
                 topic = "allow_user"
- 
+
             elif cmd_type == "revoke":
                 if not is_admin:
                     response_text = "⚠️ <b>Permission Denied</b>: This command is restricted to administrators."
@@ -657,7 +657,7 @@ class handler(BaseHTTPRequestHandler):
                                 logger.error(f"Failed to send access revoked notification to user {target_uid}: {ex}")
                         else:
                             response_text = f"❌ Failed to revoke user: {err}"
-                
+
                 send_message(chat_id, response_text)
                 topic = "revoke_user"
 
@@ -677,7 +677,7 @@ class handler(BaseHTTPRequestHandler):
                             response_text += (
                                 f"{status_emoji} <code>{u.get('user_id')}</code> — {uname} ({role_emoji})\n"
                             )
-                
+
                 send_message(chat_id, response_text)
                 topic = "list_users"
 
@@ -731,29 +731,19 @@ class handler(BaseHTTPRequestHandler):
             # Fetch active allowed users to send the quiz to
             active_users = [u for u in get_all_users() if u.get("is_active")]
             logger.info(f"[QUIZ TRIGGER] Fetched {len(active_users)} active users from DB: {[u.get('user_id') for u in active_users]}")
-            
-            # Collect unique chat IDs to send the quiz to (both individual user IDs and group IDs)
+
+            # Collect unique group chat IDs to send the quiz to (negative IDs)
             target_ids = set()
             for user in active_users:
                 uid = user.get("user_id")
-                if uid is not None:
-                    try:
-                        target_ids.add(int(uid))
-                    except (ValueError, TypeError):
-                        pass
+                if uid and int(uid) < 0:
+                    target_ids.add(int(uid))
 
-            # Also add the main TELEGRAM_CHAT_ID if configured
-            if TELEGRAM_CHAT_ID:
-                try:
-                    target_ids.add(int(TELEGRAM_CHAT_ID))
-                except ValueError:
-                    pass
-
-            logger.info(f"[QUIZ TRIGGER] TELEGRAM_CHAT_ID env value='{TELEGRAM_CHAT_ID}', final target_ids={list(target_ids)}")
+            logger.info(f"[QUIZ TRIGGER] Target group chat IDs computed={list(target_ids)}")
 
             if not target_ids:
                 logger.error("No target chat or users found to send the quiz to.")
-                self.send_json(400, {"error": "No active allowed users or TELEGRAM_CHAT_ID configured"})
+                self.send_json(400, {"error": "No active allowed users configured"})
                 return
 
             total_sent_count = 0
@@ -765,7 +755,7 @@ class handler(BaseHTTPRequestHandler):
                 # Generate Quiz once per iteration to share across all users
                 quiz_data = generate_quiz()
                 last_category = quiz_data.get("category", "general")
-                
+
                 # Save quiz to history first to get database ID (shared across both inline and poll formats)
                 quiz_id = save_quiz_to_history(
                     question=quiz_data["question"],
@@ -914,7 +904,7 @@ class handler(BaseHTTPRequestHandler):
 
                 role_badge = f'<span class="badge badge-admin">admin</span>' if role == 'admin' else f'<span class="badge badge-regular">regular</span>'
                 status_badge = f'<span class="badge badge-active">active</span>' if is_active else f'<span class="badge badge-inactive">revoked</span>'
-                
+
                 rows_html += f"""
                 <tr>
                     <td><code>{uid}</code></td>
