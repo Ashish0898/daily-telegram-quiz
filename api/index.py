@@ -174,30 +174,43 @@ class handler(BaseHTTPRequestHandler):
         self.close_connection = True
 
     def get_resolved_path(self) -> str:
+        x_fwd = self.headers.get('x-forwarded-uri')
+        x_inv = self.headers.get('x-invoke-path')
+        x_match = self.headers.get('x-matched-path')
+        x_cron = self.headers.get('x-vercel-cron')
+        ua = self.headers.get('user-agent')
+        logger.info(f"[PATH RESOLUTION] self.path='{self.path}' x-forwarded-uri='{x_fwd}' x-invoke-path='{x_inv}' x-matched-path='{x_match}' x-vercel-cron='{x_cron}' user-agent='{ua}'")
+
         # Prefer Vercel forwarded URI or invoke path over internal rewrite matched path
-        raw_path = self.headers.get('x-forwarded-uri') or self.headers.get('x-invoke-path')
+        raw_path = x_fwd or x_inv
         if not raw_path:
-            matched_path = self.headers.get('x-matched-path')
-            if matched_path and urlparse(matched_path).path.rstrip('/') not in ('/api/index.py', '/api/index', '/api'):
-                raw_path = matched_path
+            if x_match and urlparse(x_match).path.rstrip('/') not in ('/api/index.py', '/api/index', '/api'):
+                raw_path = x_match
             else:
                 raw_path = self.path
 
         parsed_url = urlparse(raw_path)
-        return parsed_url.path.rstrip('/')
+        resolved = parsed_url.path.rstrip('/')
+        logger.info(f"[PATH RESOLUTION] Resolved path -> '{resolved}'")
+        return resolved
 
     def do_POST(self):
         path = self.get_resolved_path()
+        logger.info(f"[DO_POST] Resolved path='{path}', self.path='{self.path}'")
 
         if path == '/api/quiz':
+            logger.info("[DO_POST] Branch: /api/quiz -> handle_quiz_trigger()")
             self.handle_quiz_trigger()
         elif path in ('/api/telegram', '/api/index', '/api', '', '/api/index.py'):
+            logger.info("[DO_POST] Branch: telegram webhook -> handle_telegram_webhook()")
             self.handle_telegram_webhook()
         else:
+            logger.warning(f"[DO_POST] Branch: Not found (404) for path='{path}'")
             self.send_json(404, {"error": f"Path {self.path} not found"})
 
     def do_GET(self):
         path = self.get_resolved_path()
+        logger.info(f"[DO_GET] Resolved path='{path}', self.path='{self.path}'")
 
         if path == '':
             root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -206,6 +219,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     with open(index_html_path, 'r', encoding='utf-8') as f:
                         html_content = f.read()
+                    logger.info("[DO_GET] Branch: serving index.html")
                     self.send_response(200)
                     self.send_header('Content-Type', 'text/html')
                     self.send_header('Content-Length', str(len(html_content.encode('utf-8'))))
@@ -218,6 +232,7 @@ class handler(BaseHTTPRequestHandler):
                     logger.error(f"Failed to read index.html: {e}")
 
         if path in ('', '/api', '/api/index', '/api/index.py'):
+            logger.info("[DO_GET] Branch: API health status 200 JSON")
             self.send_json(200, {
                 "name": "Daily Telegram Quiz Bot API",
                 "status": "healthy",
@@ -228,17 +243,21 @@ class handler(BaseHTTPRequestHandler):
                 }
             })
         elif path == '/api/telegram':
+            logger.info("[DO_GET] Branch: /api/telegram webhook active message")
             self.send_json(200, {
                 "status": "active",
                 "message": "Webhook endpoint is active. Please send POST requests from Telegram or simulate them using matching security headers."
             })
         elif path == '/api/quiz':
+            logger.info("[DO_GET] Branch: /api/quiz -> handle_quiz_trigger()")
             self.handle_quiz_trigger()
         elif path == '/api/users':
+            logger.info("[DO_GET] Branch: /api/users -> handle_users_get()")
             raw_url = self.headers.get('x-forwarded-uri') or self.headers.get('x-invoke-path') or self.path
             parsed_url = urlparse(raw_url)
             self.handle_users_get(parsed_url.query)
         else:
+            logger.warning(f"[DO_GET] Branch: Not found (404) for path='{path}'")
             self.send_json(404, {"error": f"Path {self.path} not found"})
 
     def handle_telegram_webhook(self):
@@ -694,8 +713,10 @@ class handler(BaseHTTPRequestHandler):
             logger.warning(f"Could not parse count parameter, defaulting to {count}: {e}")
 
         try:
+            logger.info(f"[QUIZ TRIGGER] Start execution. raw_url='{raw_url}', parsed count={count}")
             # Fetch active allowed users to send the quiz to
             active_users = [u for u in get_all_users() if u.get("is_active")]
+            logger.info(f"[QUIZ TRIGGER] Fetched {len(active_users)} active users from DB: {[u.get('user_id') for u in active_users]}")
             
             # Collect unique chat IDs to send the quiz to (both individual user IDs and group IDs)
             target_ids = set()
@@ -713,6 +734,8 @@ class handler(BaseHTTPRequestHandler):
                     target_ids.add(int(TELEGRAM_CHAT_ID))
                 except ValueError:
                     pass
+
+            logger.info(f"[QUIZ TRIGGER] TELEGRAM_CHAT_ID env value='{TELEGRAM_CHAT_ID}', final target_ids={list(target_ids)}")
 
             if not target_ids:
                 logger.error("No target chat or users found to send the quiz to.")
