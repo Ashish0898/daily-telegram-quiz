@@ -198,6 +198,13 @@ class handler(BaseHTTPRequestHandler):
         path = self.get_resolved_path()
         logger.info(f"[DO_POST] Resolved path='{path}', self.path='{self.path}'")
 
+        ua = self.headers.get('user-agent', '').lower()
+        x_cron = self.headers.get('x-vercel-cron')
+        if 'vercel-cron' in ua or x_cron:
+            logger.info(f"[DO_POST] Vercel Cron detected (user-agent='{self.headers.get('user-agent')}') -> handle_quiz_trigger()")
+            self.handle_quiz_trigger()
+            return
+
         if path == '/api/quiz':
             logger.info("[DO_POST] Branch: /api/quiz -> handle_quiz_trigger()")
             self.handle_quiz_trigger()
@@ -211,6 +218,13 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.get_resolved_path()
         logger.info(f"[DO_GET] Resolved path='{path}', self.path='{self.path}'")
+
+        ua = self.headers.get('user-agent', '').lower()
+        x_cron = self.headers.get('x-vercel-cron')
+        if 'vercel-cron' in ua or x_cron:
+            logger.info(f"[DO_GET] Vercel Cron detected (user-agent='{self.headers.get('user-agent')}') -> handle_quiz_trigger()")
+            self.handle_quiz_trigger()
+            return
 
         if path == '':
             root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
