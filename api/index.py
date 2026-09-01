@@ -533,6 +533,7 @@ class handler(BaseHTTPRequestHandler):
                 else:
                     tracks_to_run = [None]
 
+                count = len(tracks_to_run)
                 quizzes_sent = []
                 last_category = "general"
 
