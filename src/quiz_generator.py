@@ -1,4 +1,5 @@
 import os
+import re
 import random
 import requests
 import json
@@ -127,6 +128,45 @@ TRACK_PROMPTS = {
 }
 
 
+def _clean_math_text(text: str) -> str:
+    """Clean up raw LaTeX dollar signs and common LaTeX commands for clean Telegram rendering."""
+    if not text:
+        return text
+    # Strip LaTeX math delimiters ($...$ or $$...$$)
+    text = re.sub(r'\$\$([^\$]+)\$\$', r'\1', text)
+    text = re.sub(r'\$([^\$]+)\$', r'\1', text)
+
+    # Common LaTeX macro replacements
+    replacements = [
+        (r'\\frac\{([^}]+)\}\{([^}]+)\}', r'(\1/\2)'),
+        (r'\\cos', 'cos'),
+        (r'\\sin', 'sin'),
+        (r'\\tan', 'tan'),
+        (r'\\log', 'log'),
+        (r'\\ln', 'ln'),
+        (r'\\cdot', '·'),
+        (r'\\times', '×'),
+        (r'\\dots', '...'),
+        (r'\\circ', '°'),
+        (r'\\le', '≤'),
+        (r'\\ge', '≥'),
+        (r'\\ne', '≠'),
+        (r'\\approx', '≈'),
+        (r'\\sqrt\{([^}]+)\}', r'√(\1)'),
+        (r'\\pi', 'π'),
+        (r'\\theta', 'θ'),
+        (r'\^2', '²'),
+        (r'\^3', '³'),
+        (r'\^4', '⁴'),
+        (r'\^t', 'ᵗ'),
+        (r'\^n', 'ⁿ'),
+        (r'\^x', 'ˣ'),
+    ]
+    for pattern, repl in replacements:
+        text = re.sub(pattern, repl, text)
+    return text.strip()
+
+
 @log_step(logger)
 def generate_quiz(track: str = None, topic: str = None) -> dict:
     """
@@ -204,6 +244,7 @@ def generate_quiz(track: str = None, topic: str = None) -> dict:
         "You are an expert technical interviewer, cognitive puzzle designer, and staff software assessment engineer. "
         "Your task is to generate a single highly engaging, accurate multiple-choice question that tests logical reasoning, cognitive deduction, code analysis, or system architecture trade-offs. "
         "CRITICAL: Avoid obscure textbook trivia, pedantic syntax memorization, or academic proofs. Every question must be rewarding, solvable through deduction, intuition, or engineering experience, and deliver an 'Aha!' moment upon resolution. "
+        "CRITICAL FORMATTING: Telegram does NOT render LaTeX ($...$ or \\frac). Do NOT use dollar signs ($) or LaTeX macros. Use clean Unicode characters (e.g. ², ³, °, π, θ, √, ·, /) or clean plain text / inline <code> tags for all formulas. "
         "You MUST respond ONLY with a valid JSON object matching the requested schema. Do NOT include markdown formatting or commentary outside the JSON."
     )
 
@@ -300,9 +341,9 @@ def generate_quiz(track: str = None, topic: str = None) -> dict:
             raise ValueError(f"correct_option_id {correct_idx} out of range")
 
         quiz_data["correct_option_id"] = correct_idx
-        quiz_data["question"] = str(quiz_data["question"]).strip()
-        quiz_data["options"] = [str(opt).strip() for opt in quiz_data["options"][:4]]
-        quiz_data["explanation"] = str(quiz_data["explanation"]).strip()
+        quiz_data["question"] = _clean_math_text(str(quiz_data["question"]))
+        quiz_data["options"] = [_clean_math_text(str(opt)) for opt in quiz_data["options"][:4]]
+        quiz_data["explanation"] = _clean_math_text(str(quiz_data["explanation"]))
         quiz_data["category"] = str(quiz_data.get("category", category)).strip()
         quiz_data["track"] = selected_track
 
