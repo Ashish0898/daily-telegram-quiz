@@ -128,24 +128,56 @@ TRACK_PROMPTS = {
 
 
 @log_step(logger)
-def generate_quiz(track: str = None) -> dict:
+def generate_quiz(track: str = None, topic: str = None) -> dict:
     """
-    Generate a high-quality interview / cognitive reasoning quiz.
+    Generate a high-quality interview, reasoning, or custom domain quiz.
+    If topic is provided, generates an engaging question for that custom topic.
     If track is provided ('cognitive', 'code', 'sysdesign', 'algo'), generates for that track.
     Otherwise, picks from today's weekday schedule.
     """
     weekday = datetime.now(timezone.utc).weekday()
 
-    if track and track in TRACKS_DATA:
+    if topic:
+        selected_track = "custom"
+        topic_clean = topic.strip()
+        math_keywords = ["calculus", "trig", "algebra", "geometry", "math", "derivative", "integral", "matrix", "vector", "statistic", "probability"]
+        if any(k in topic_clean.lower() for k in math_keywords):
+            category = f"Mathematics: {topic_clean.title()}"
+        else:
+            category = f"Topic: {topic_clean.title()}"
+        selected_seed = topic_clean.title()
+        track_guideline = (
+            f"TOPIC: {topic_clean}.\n"
+            f"- Generate a crisp, engaging multiple-choice question on {topic_clean} testing conceptual understanding, core intuition, or a clever problem.\n"
+            f"- Focus on conceptual clarity, visual/geometric deduction, or an 'Aha!' insight rather than tedious multi-page algebraic grinding."
+        )
+    elif track and track in TRACKS_DATA:
         track_info = TRACKS_DATA[track]
         category = track_info.get("name", track.capitalize())
         seeds_list = track_info.get("seeds", ["General problem solving"])
         selected_seed = random.choice(seeds_list)
         selected_track = track
+        track_guideline = TRACK_PROMPTS.get(selected_track, TRACK_PROMPTS["cognitive"])
     elif track and track in TRACK_PROMPTS:
         selected_track = track
         category = track.capitalize()
         selected_seed = "Practical problem solving"
+        track_guideline = TRACK_PROMPTS.get(selected_track, TRACK_PROMPTS["cognitive"])
+    elif track and track not in ("workout", "all"):
+        # The user passed a custom topic in the track parameter (e.g. track="calculus")
+        selected_track = "custom"
+        topic_clean = track.strip()
+        math_keywords = ["calculus", "trig", "algebra", "geometry", "math", "derivative", "integral", "matrix", "vector", "statistic", "probability"]
+        if any(k in topic_clean.lower() for k in math_keywords):
+            category = f"Mathematics: {topic_clean.title()}"
+        else:
+            category = f"Topic: {topic_clean.title()}"
+        selected_seed = topic_clean.title()
+        track_guideline = (
+            f"TOPIC: {topic_clean}.\n"
+            f"- Generate a crisp, engaging multiple-choice question on {topic_clean} testing conceptual understanding, core intuition, or a clever problem.\n"
+            f"- Focus on conceptual clarity, visual/geometric deduction, or an 'Aha!' insight rather than tedious multi-page algebraic grinding."
+        )
     else:
         # Fall back to weekday schedule
         theme = THEME_SCHEDULE.get(weekday, THEME_SCHEDULE.get(0))
@@ -153,6 +185,7 @@ def generate_quiz(track: str = None) -> dict:
         selected_track = theme.get("track", "cognitive")
         seeds_list = theme.get("seeds", ["System design and reasoning"])
         selected_seed = random.choice(seeds_list)
+        track_guideline = TRACK_PROMPTS.get(selected_track, TRACK_PROMPTS["cognitive"])
 
     # Fetch recent questions from the database to prevent duplicates
     recent_questions = []
@@ -166,8 +199,6 @@ def generate_quiz(track: str = None) -> dict:
         logger.warning(f"Could not retrieve recent questions from database: {e}")
 
     logger.info(f"Generating quiz for track: '{selected_track}' | Category: '{category}' | Seed: '{selected_seed}'")
-
-    track_guideline = TRACK_PROMPTS.get(selected_track, TRACK_PROMPTS["cognitive"])
 
     system_prompt = (
         "You are an expert technical interviewer, cognitive puzzle designer, and staff software assessment engineer. "

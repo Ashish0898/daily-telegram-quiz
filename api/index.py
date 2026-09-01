@@ -89,6 +89,7 @@ def build_help_message(is_admin: bool = False) -> str:
         "Daily technical interview preparation, coding bug puzzles, system design dilemmas, and cognitive reasoning challenges!\n\n"
         "<b>Available Commands:</b>\n"
         "• /quiz — Send today's challenge question\n"
+        "• /quiz &lt;topic&gt; [count] — Generate an on-demand quiz on ANY topic (e.g. <code>/quiz calculus</code>, <code>/quiz trigonometry 3</code>, <code>/quiz rust</code>)\n"
         "• /quiz workout — Send the 3-Question Daily Workout (Cognitive + Code + System Design)\n"
         "• /quiz cognitive — Practice Cognitive Reasoning & Mental Models\n"
         "• /quiz code — Practice 'Guess the Output' & Bug Spotting snippets\n"
@@ -530,6 +531,22 @@ class handler(BaseHTTPRequestHandler):
                     num = max(1, min(int(q_clean), 10))
                     workout_seq = ["cognitive", "code", "sysdesign", "algo"]
                     tracks_to_run = [workout_seq[i % len(workout_seq)] for i in range(num)]
+                elif q_clean:
+                    # Custom topic support (e.g. "calculus", "trigonometry 2", "linear algebra 3")
+                    parts = q_clean.split()
+                    custom_count = 1
+                    topic_parts = []
+                    for p in parts:
+                        if p.isdigit():
+                            custom_count = max(1, min(int(p), 5))
+                        else:
+                            topic_parts.append(p)
+                    custom_topic = " ".join(topic_parts) if topic_parts else None
+                    if custom_topic:
+                        tracks_to_run = [custom_topic] * custom_count
+                    else:
+                        workout_seq = ["cognitive", "code", "sysdesign", "algo"]
+                        tracks_to_run = [workout_seq[i % len(workout_seq)] for i in range(custom_count)]
                 else:
                     tracks_to_run = [None]
 
