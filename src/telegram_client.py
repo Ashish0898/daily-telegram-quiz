@@ -24,6 +24,22 @@ def send_message(chat_id: int, text: str, parse_mode: str = "HTML", disable_prev
     try:
         logger.info(f"Posting text message to chat {chat_id}")
         response = requests.post(url, json=payload, timeout=15)
+        
+        # Auto-recovery: if Telegram fails due to HTML entities, retry as clean plain text
+        if response.status_code == 400 and ("can't parse entities" in response.text.lower() or "parsing" in response.text.lower()):
+            import re
+            logger.warning(f"Telegram parse error: {response.text}. Retrying with sanitized text fallback.")
+            fallback_payload = {
+                "chat_id": chat_id,
+                "text": re.sub(r"<[^>]+>", "", text),
+                "disable_web_page_preview": disable_preview
+            }
+            if reply_markup:
+                fallback_payload["reply_markup"] = reply_markup
+            fallback_res = requests.post(url, json=fallback_payload, timeout=15)
+            fallback_res.raise_for_status()
+            return fallback_res.json()
+
         response.raise_for_status()
         return response.json()
     except Exception as e:

@@ -85,12 +85,17 @@ def parse_command(text: str) -> dict:
 def build_help_message(is_admin: bool = False) -> str:
     """Build a dynamic help text."""
     msg = (
-        "🧠 <b>Daily Trivia Quiz Bot</b> 🤖\n\n"
-        "I generate and send interactive multiple-choice quiz polls!\n\n"
+        "🧠 <b>ByteSize Brain Bot — Interview & Cognitive Workout</b> 🤖\n\n"
+        "Daily technical interview preparation, coding bug puzzles, system design dilemmas, and cognitive reasoning challenges!\n\n"
         "<b>Available Commands:</b>\n"
-        "• /quiz [count] — Generate and send new interactive quiz(zes) (default: 1, max: 10).\n"
-        "• /leaderboard — View current scores and standings.\n"
-        "• /help — Show this help message."
+        "• /quiz — Send today's challenge question\n"
+        "• /quiz workout — Send the 3-Question Daily Workout (Cognitive + Code + System Design)\n"
+        "• /quiz cognitive — Practice Cognitive Reasoning & Mental Models\n"
+        "• /quiz code — Practice 'Guess the Output' & Bug Spotting snippets\n"
+        "• /quiz sysdesign — Practice System Design & Architecture dilemmas\n"
+        "• /quiz algo — Practice Algorithmic Pattern Recognition\n"
+        "• /leaderboard — View player rankings and accuracy\n"
+        "• /help — Show this help message"
     )
     if is_admin:
         msg += (
@@ -508,22 +513,32 @@ class handler(BaseHTTPRequestHandler):
                 topic = "help"
 
             elif cmd_type == "quiz":
-                # Determine how many quizzes to send
-                count = 1
-                if query:
-                    try:
-                        count = int(query.strip())
-                        # Restrict count to a reasonable range to avoid Telegram rate limits
-                        count = max(1, min(count, 10))
-                    except ValueError:
-                        pass
+                tracks_to_run = []
+                q_clean = query.strip().lower() if query else ""
+
+                if q_clean in ("workout", "all", "3"):
+                    tracks_to_run = ["cognitive", "code", "sysdesign"]
+                elif q_clean in ("cognitive", "brain", "reasoning", "logic", "mental"):
+                    tracks_to_run = ["cognitive"]
+                elif q_clean in ("code", "snippet", "bug", "python", "output"):
+                    tracks_to_run = ["code"]
+                elif q_clean in ("sysdesign", "system", "arch", "design"):
+                    tracks_to_run = ["sysdesign"]
+                elif q_clean in ("algo", "dsa", "patterns", "algorithm"):
+                    tracks_to_run = ["algo"]
+                elif q_clean.isdigit():
+                    num = max(1, min(int(q_clean), 10))
+                    workout_seq = ["cognitive", "code", "sysdesign", "algo"]
+                    tracks_to_run = [workout_seq[i % len(workout_seq)] for i in range(num)]
+                else:
+                    tracks_to_run = [None]
 
                 quizzes_sent = []
                 last_category = "general"
 
-                for i in range(count):
+                for i, track_name in enumerate(tracks_to_run):
                     send_chat_action(chat_id, "upload_document")
-                    quiz_data = generate_quiz()
+                    quiz_data = generate_quiz(track=track_name)
                     last_category = quiz_data.get("category", "general")
 
                     # Save quiz to history first to get the database row ID
@@ -751,9 +766,11 @@ class handler(BaseHTTPRequestHandler):
             quizzes_sent = []
             last_category = "general"
 
+            workout_seq = ["cognitive", "code", "sysdesign", "algo"]
             for i in range(count):
-                # Generate Quiz once per iteration to share across all users
-                quiz_data = generate_quiz()
+                # Generate Quiz across diverse workout tracks (Cognitive -> Code -> System Design)
+                track_name = workout_seq[i % len(workout_seq)]
+                quiz_data = generate_quiz(track=track_name)
                 last_category = quiz_data.get("category", "general")
 
                 # Save quiz to history first to get database ID (shared across both inline and poll formats)

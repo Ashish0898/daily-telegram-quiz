@@ -1,261 +1,132 @@
 {
-  "0": {
-    "category": "Data Structures",
-    "seeds": {
-      "easy": [
-        "arrays and lists",
-        "hash tables and dictionary lookups",
-        "stack vs queue",
-        "linked list basics",
-        "string operations",
-        "tree basics",
-        "graph basics"
-      ],
-      "intermediate": [
-        "hash maps and collision handling",
-        "priority queues and heaps",
-        "tries and prefix trees",
-        "circular buffers",
-        "LRU cache design",
-        "tree traversals",
-        "graphs and adjacency lists"
-      ],
-      "advanced": [
-        "balanced BSTs and B-trees",
-        "red-black trees and AVL trees",
-        "skip lists and Bloom filters",
-        "segment trees with lazy propagation",
-        "disjoint set union",
-        "suffix arrays and tries"
-      ],
-      "elite": [
-        "lock-free concurrent data structures",
-        "persistent data structures",
-        "Merkle trees for AI data integrity",
-        "cache-aware data layout",
-        "Cuckoo hashing and Robin Hood hashing"
+  "tracks": {
+    "cognitive": {
+      "name": "Cognitive Reasoning & Mental Models",
+      "seeds": [
+        "Cognitive Reflection & Intuition Traps (System 1 vs System 2)",
+        "Probability Paradoxes & Bayesian Thinking (False Positives, Base Rate Fallacy)",
+        "Behavioral Economics & Game Theory (Prisoner's Dilemma, Nash Equilibrium, Perverse Incentives)",
+        "Decision Mental Models (Chesterton's Fence, Inversion, Second-Order Thinking, Goodhart's Law)",
+        "Lateral Thinking & Constraint Deduction (Logic Grids, Deductive Elimination)",
+        "Situational Engineering Leadership & Trade-off Dilemmas (Technical Debt vs Velocity, Buy vs Build)"
+      ]
+    },
+    "code": {
+      "name": "Practical Coding & Bug Spotting",
+      "seeds": [
+        "Python Gotchas (Mutable Default Arguments, Scope & Late Binding Closures, 'is' vs '==')",
+        "Concurrency & Async Pitfalls (Race Conditions, Deadlocks, Event Loop Blocking, Shared State)",
+        "Memory & Object References (Shallow vs Deep Copy, Garbage Collection, Cache Invalidation Leaks)",
+        "SQL & Database Query Traps (NULL in 'NOT IN', Offset Pagination Pitfalls, Index SARGability)",
+        "Type Coercion & Arithmetic Edge Cases (Floating Point Precision, Integer Overflow, Truthy vs Falsy)",
+        "Code Output Deduction (Predicting evaluation order, exception handling flow, generator exhaustion)"
+      ]
+    },
+    "sysdesign": {
+      "name": "System Design & Architecture Dilemmas",
+      "seeds": [
+        "Cache Stampede & Invalidation (Thundering Herd, Probabilistic Expiration, Write-Through vs Write-Back)",
+        "Storage Engine Trade-offs (LSM-Tree Write Amplification vs B-Tree Read Latency, Append-Only Logs)",
+        "Scalability & Partitioning (Consistent Hashing, Hotspot Mitigation, Database Sharding, Replication Lag)",
+        "Reliability & Fault Tolerance (Circuit Breakers, Rate Limiting Algorithms, Idempotency Keys, Backpressure)",
+        "Production Incident Postmortems (Diagnosing midnight cron spikes, Memory fragmentation OOMs, DNS TTL issues)",
+        "Modern AI & LLM Infrastructure (RAG Chunking Trade-offs, Context Dilution, Vector Search Latency vs Recall)"
+      ]
+    },
+    "algo": {
+      "name": "Algorithmic Patterns & Complexity",
+      "seeds": [
+        "Algorithmic Pattern Recognition (Sliding Window vs Two Pointers vs Monotonic Stack vs Two Heaps)",
+        "Streaming Data Structures (Finding Median in a Stream, Top-K Frequent Elements, Bloom Filters)",
+        "Graph & Tree Strategy (Cycle Detection in Dependencies via Topological Sort, Shortest Path Heuristics)",
+        "Dynamic Programming vs Greedy Decisions (When greedy fails on arbitrary coin systems, Interval Scheduling)",
+        "Cache-Aware Time vs Space Complexity (Memory locality in arrays vs pointer chasing in linked nodes)"
       ]
     }
   },
-  "1": {
-    "category": "Algorithms & Complexity",
-    "seeds": {
-      "easy": [
-        "Big O notation",
-        "time vs space complexity",
-        "linear vs binary search",
-        "recursion and base cases",
-        "sorting basics",
-        "greedy vs dynamic programming"
-      ],
-      "intermediate": [
-        "two pointers",
-        "sliding window",
-        "backtracking",
-        "memoization vs tabulation",
-        "Dijkstra and A*",
-        "DFS vs BFS",
-        "topological sort"
-      ],
-      "advanced": [
-        "Kruskal and Prim minimum spanning trees",
-        "Knuth-Morris-Pratt pattern matching",
-        "binary search on answer",
-        "dynamic programming optimization",
-        "network flow basics",
-        "divide-and-conquer patterns"
-      ],
-      "elite": [
-        "maximum flow and matching",
-        "strongly connected components",
-        "suffix automata and arrays",
-        "approximation algorithms",
-        "amortized analysis",
-        "algorithmic trade-offs in inference systems"
+  "schedule": {
+    "0": {
+      "category": "Algorithmic Patterns & Complexity",
+      "track": "algo",
+      "seeds": [
+        "Sliding Window vs Two Pointers",
+        "Monotonic Stack for Next Greater Element",
+        "Two Heaps for Streaming Median",
+        "Topological Sort for Dependency Cycles",
+        "Prefix Sums for Subarray Queries",
+        "DP vs Greedy Decision Trade-offs"
       ]
-    }
-  },
-  "2": {
-    "category": "Databases & SQL",
-    "seeds": {
-      "easy": [
-        "primary and foreign keys",
-        "SELECT / WHERE / GROUP BY",
-        "joins and their trade-offs",
-        "indexes and their purpose",
-        "normalization basics",
-        "transactions basics"
-      ],
-      "intermediate": [
-        "ACID and isolation levels",
-        "query plans and EXPLAIN",
-        "replication and sharding",
-        "denormalization trade-offs",
-        "materialized views",
-        "connection pooling"
-      ],
-      "advanced": [
-        "B-tree vs LSM indexing",
-        "MVCC and write skew",
-        "locking and deadlocks",
-        "partitioning and clustering",
-        "cost-based optimization",
-        "vector search data stores"
-      ],
-      "elite": [
-        "distributed transactions and consensus",
-        "WAL and ARIES recovery",
-        "multi-region replication",
-        "Paxos vs Raft",
-        "2PC vs 3PC vs Saga",
-        "vector databases at scale"
+    },
+    "1": {
+      "category": "Practical Coding & 'Guess the Output'",
+      "track": "code",
+      "seeds": [
+        "Python Mutable Default Arguments",
+        "Late Binding in Closures & Lambdas",
+        "Shallow vs Deep Copy Mutations",
+        "Async Event Loop Blocking",
+        "Integer Caching & Identity vs Equality",
+        "Generator Exhaustion and Iterator Lifecycles"
       ]
-    }
-  },
-  "3": {
-    "category": "System Design & Architecture",
-    "seeds": {
-      "easy": [
-        "client-server model",
-        "DNS and HTTP",
-        "load balancers",
-        "caching basics",
-        "database replication",
-        "APIs and idempotency"
-      ],
-      "intermediate": [
-        "CDNs and cache invalidation",
-        "load balancing strategies",
-        "service discovery",
-        "API gateways",
-        "rate limiting",
-        "queues and event-driven design"
-      ],
-      "advanced": [
-        "CAP and PACELC",
-        "message queues and partitioning",
-        "circuit breakers and retries",
-        "backpressure and load shedding",
-        "consistency models",
-        "LLM service orchestration"
-      ],
-      "elite": [
-        "multi-region active-active design",
-        "eventual consistency and vector clocks",
-        "exactly-once semantics",
-        "leader election",
-        "observability and SLOs",
-        "resilient AI product architecture"
+    },
+    "2": {
+      "category": "Databases & Storage Engineering",
+      "track": "sysdesign",
+      "seeds": [
+        "LSM-Tree vs B-Tree Storage Trade-offs",
+        "NULL Pitfalls in SQL NOT IN vs NOT EXISTS",
+        "Index SARGability & Query Plans",
+        "Transaction Isolation Anomalies & Write Skew",
+        "Replication Lag in Read-Heavy Architectures",
+        "Connection Pool Exhaustion Mitigation"
       ]
-    }
-  },
-  "4": {
-    "category": "Python Programming",
-    "seeds": {
-      "easy": [
-        "lists vs tuples",
-        "dictionaries and hashing",
-        "functions and scopes",
-        "exceptions and debugging",
-        "list comprehensions",
-        "classes and objects"
-      ],
-      "intermediate": [
-        "iterators and generators",
-        "decorators and closures",
-        "context managers",
-        "typing and dataclasses",
-        "memory management and __slots__",
-        "module packaging"
-      ],
-      "advanced": [
-        "async/await and event loops",
-        "descriptors",
-        "metaclasses",
-        "MRO and C3 linearization",
-        "memoryviews and buffers",
-        "multiprocessing vs threading"
-      ],
-      "elite": [
-        "CPython internals and bytecode",
-        "GIL and concurrency",
-        "garbage collection",
-        "coroutines and scheduler internals",
-        "C extensions and PyBind11",
-        "Python for AI service performance"
+    },
+    "3": {
+      "category": "Senior System Design & Scalability",
+      "track": "sysdesign",
+      "seeds": [
+        "Cache Stampede (Thundering Herd) Prevention",
+        "Rate Limiting: Token Bucket vs Leaky Bucket vs Sliding Window",
+        "Consistent Hashing & Virtual Nodes",
+        "Idempotency Key Strategies in Distributed Payments",
+        "Backpressure & Load Shedding under Spike Traffic",
+        "Circuit Breakers and Jittered Retries"
       ]
-    }
-  },
-  "5": {
-    "category": "DevOps, Git & Linux",
-    "seeds": {
-      "easy": [
-        "version control fundamentals",
-        "common git workflows",
-        "branching and merging",
-        "Linux basics",
-        "containers and images"
-      ],
-      "intermediate": [
-        "CI/CD concepts",
-        "shell scripting",
-        "permissions and ownership",
-        "networking basics",
-        "SSH and secrets",
-        "observability basics"
-      ],
-      "advanced": [
-        "infrastructure as code",
-        "git rebase vs merge",
-        "process scheduling",
-        "systemd and cron",
-        "load balancing and reverse proxies",
-        "container orchestration"
-      ],
-      "elite": [
-        "Linux namespaces and cgroups",
-        "eBPF and XDP",
-        "kernel networking",
-        "caching and storage internals",
-        "Kubernetes control loops",
-        "deploying AI services reliably"
+    },
+    "4": {
+      "category": "Production Postmortems & Incident Diagnostics",
+      "track": "sysdesign",
+      "seeds": [
+        "Investigating Midnight Cron Job Crashes (DST / UTC boundaries)",
+        "Diagnosing 100% CPU Spike with 0 Incoming Traffic",
+        "Memory Leaks via Unbounded In-Memory Caches",
+        "Deadlocks from Inconsistent Lock Acquisition Order",
+        "DNS Caching & Stale Upstream Service IPs",
+        "Linux OOM Killer Process Selection Mechanics"
       ]
-    }
-  },
-  "6": {
-    "category": "AI, LLMs & Agents",
-    "seeds": {
-      "easy": [
-        "what is an LLM",
-        "transformers basics",
-        "prompting fundamentals",
-        "RAG basics",
-        "AI agents basics",
-        "hallucination and grounding"
-      ],
-      "intermediate": [
-        "embeddings and vector search",
-        "context windows and tokenization",
-        "function calling and tool use",
-        "prompt engineering patterns",
-        "evaluation and benchmarking",
-        "retrieval pipelines"
-      ],
-      "advanced": [
-        "fine-tuning and RLHF",
-        "agent orchestration",
-        "chunking and retrieval quality",
-        "memory systems for agents",
-        "guardrails and safety",
-        "model serving trade-offs"
-      ],
-      "elite": [
-        "multi-agent planning",
-        "speculative decoding",
-        "attention variants",
-        "MCP and tool interoperability",
-        "evaluation for production AI systems",
-        "LLM observability, latency, and cost"
+    },
+    "5": {
+      "category": "Cognitive Reasoning & Logic Paradoxes",
+      "track": "cognitive",
+      "seeds": [
+        "Cognitive Reflection Test & Intuition Traps",
+        "Base Rate Fallacy & False Positive Probability",
+        "The Monty Hall Problem & Conditional Odds",
+        "Braess's Paradox & Network Inefficiencies",
+        "Chesterton's Fence & System Modifications",
+        "Goodhart's Law & Perverse Performance Metrics"
+      ]
+    },
+    "6": {
+      "category": "AI Systems, LLMs & Applied Mental Models",
+      "track": "sysdesign",
+      "seeds": [
+        "RAG Chunk Size: Focus vs Context Window Trade-offs",
+        "Vector Search: Approximate Nearest Neighbor (ANN) Recall vs Speed",
+        "Mitigating LLM Hallucinations via Structured Tool Outputs",
+        "Semantic Caching for High-Throughput LLM Apps",
+        "Second-Order Thinking in Autonomous Agent Planning",
+        "First Principles in AI Infrastructure Cost Optimization"
       ]
     }
   }
