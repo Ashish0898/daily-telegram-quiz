@@ -3,12 +3,13 @@
     "cognitive": {
       "name": "Cognitive Reasoning & Mental Models",
       "seeds": [
-        "Cognitive Reflection & Intuition Traps (System 1 vs System 2)",
-        "Probability Paradoxes & Bayesian Thinking (False Positives, Base Rate Fallacy)",
+        "Quantitative Logic & Set Theory (Inclusion-Exclusion Principle, Venn Diagram Overlaps, Pigeonhole Principle)",
+        "Cognitive Reflection & Intuition Traps (System 1 vs System 2, Bat & Ball, Widget Math)",
+        "Probability Paradoxes & Bayesian Thinking (False Positives, Base Rate Fallacy, Monty Hall)",
+        "Classic Brain Teasers & Rate / Work Deduction (Speed & Pipes, Weighing Scales, Logical Elimination)",
         "Behavioral Economics & Game Theory (Prisoner's Dilemma, Nash Equilibrium, Perverse Incentives)",
         "Decision Mental Models (Chesterton's Fence, Inversion, Second-Order Thinking, Goodhart's Law)",
-        "Lateral Thinking & Constraint Deduction (Logic Grids, Deductive Elimination)",
-        "Situational Engineering Leadership & Trade-off Dilemmas (Technical Debt vs Velocity, Buy vs Build)"
+        "Lateral Thinking & Constraint Deduction (Logic Grids, Deductive Elimination)"
       ]
     },
     "code": {

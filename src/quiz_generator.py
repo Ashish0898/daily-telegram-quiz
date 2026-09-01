@@ -100,9 +100,9 @@ except Exception as e:
 
 TRACK_PROMPTS = {
     "cognitive": (
-        "TRACK: Cognitive Reasoning, Intuition Traps & Mental Models.\n"
+        "TRACK: Cognitive Reasoning, Quantitative Logic & Mental Models.\n"
         "Guidelines:\n"
-        "- Generate a question testing Cognitive Reflection (where the intuitive gut reaction is wrong, e.g. bat and ball / widget math), a Probability Paradox (e.g. False Positive Base Rate Fallacy, Monty Hall, Birthday Paradox), a Behavioral Game Theory Dilemma (e.g. Prisoner's Dilemma, Nash Equilibrium, Perverse Incentives), or an applied Mental Model (Chesterton's Fence, Goodhart's Law, Braess's Paradox).\n"
+        "- Generate a question testing Quantitative Logic & Set Overlap (e.g., Venn diagram / Inclusion-Exclusion like 'In a group of 100 people, 60 use Python, 50 use Java, how many use both?', Pigeonhole Principle, or Rate & Work math), Cognitive Reflection (where the intuitive gut reaction is wrong, e.g. bat and ball / widget math), a Probability Paradox (e.g. False Positive Base Rate Fallacy, Monty Hall, Birthday Paradox), a Behavioral Game Theory Dilemma (e.g. Prisoner's Dilemma, Nash Equilibrium, Perverse Incentives), or an applied Mental Model (Chesterton's Fence, Goodhart's Law, Braess's Paradox).\n"
         "- The candidate should be able to solve it through clear logic and reflection, experiencing an 'Aha!' moment upon seeing the answer."
     ),
     "code": (
