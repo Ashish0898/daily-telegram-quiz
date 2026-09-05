@@ -1,0 +1,276 @@
+{
+  "cognitive": [
+    {
+      "question": "A bat and ball cost $1.10. The bat costs $1.00 more than the ball. How much does the ball cost?",
+      "options": ["$0.10", "$0.05", "$0.01", "$0.15"],
+      "correct_option_id": 1,
+      "explanation": "If ball is $0.05, bat is $1.05 ($1.00 more), total $1.10. Intuition impulsively says $0.10.",
+      "concept_id": "cognitive_reflection",
+      "reasoning_mode": "intuition_trap",
+      "difficulty": 2,
+      "track": "cognitive",
+      "category": "Cognitive Reasoning & Mental Models"
+    },
+    {
+      "question": "In a room of 100 developers, 70 know Python and 60 know Go. What is the MINIMUM number who must know both?",
+      "options": ["10", "30", "60", "0"],
+      "correct_option_id": 1,
+      "explanation": "70 + 60 = 130. Since room has only 100 developers, at least 130 - 100 = 30 must know both.",
+      "concept_id": "inclusion_exclusion",
+      "reasoning_mode": "deduce",
+      "difficulty": 2,
+      "track": "cognitive",
+      "category": "Cognitive Reasoning & Quantitative Logic"
+    },
+    {
+      "question": "A rare disease affects 1 in 1,000 people. A test has a 5% false positive rate and 100% accuracy for sick patients. You test positive. What is the approximate probability you are sick?",
+      "options": ["95%", "50%", "2%", "99%"],
+      "correct_option_id": 2,
+      "explanation": "In 1000 people, 1 is sick (true positive) and ~50 test false positive. 1/(1+50) ≈ 2%. Base rate fallacy.",
+      "concept_id": "base_rate_fallacy",
+      "reasoning_mode": "intuition_trap",
+      "difficulty": 3,
+      "track": "cognitive",
+      "category": "Cognitive Reasoning & Probability Paradoxes"
+    },
+    {
+      "question": "A support team is rewarded solely for closing tickets quickly. Avg time-to-close drops 40%, but reopened tickets triple. What happened?",
+      "options": ["System 1 overload", "Goodhart's Law metric gaming", "Braess's paradox", "Pigeonhole constraint"],
+      "correct_option_id": 1,
+      "explanation": "Agents close tickets prematurely to satisfy the metric without solving the underlying issue.",
+      "concept_id": "goodharts_law",
+      "reasoning_mode": "diagnose",
+      "difficulty": 2,
+      "track": "cognitive",
+      "category": "Cognitive Reasoning & Mental Models"
+    },
+    {
+      "question": "An architect wants to remove a seemingly redundant legacy check without knowing why it was added. Which mental model advises against this?",
+      "options": ["Chesterton's Fence", "Hanlon's Razor", "Occam's Razor", "Pareto Principle"],
+      "correct_option_id": 0,
+      "explanation": "Chesterton's Fence states you should never remove a fence until you understand why it was built.",
+      "concept_id": "chestertons_fence",
+      "reasoning_mode": "mental_model",
+      "difficulty": 2,
+      "track": "cognitive",
+      "category": "Cognitive Reasoning & Mental Models"
+    }
+  ],
+  "code": [
+    {
+      "question": "What is the output of this Python snippet?\n\ndef fn(val, acc=[]):\n    acc.append(val)\n    return len(acc)\n\nprint(fn('a'), fn('b'))",
+      "options": ["1 1", "1 2", "2 2", "Error"],
+      "correct_option_id": 1,
+      "explanation": "Default list arguments evaluate once at def-time and mutate across subsequent calls.",
+      "concept_id": "python_mutable_defaults",
+      "reasoning_mode": "predict",
+      "difficulty": 2,
+      "track": "code",
+      "category": "Practical Coding & Bug Spotting"
+    },
+    {
+      "question": "What is the output of this Python code?\n\nfuncs = [lambda: i for i in range(3)]\nprint([f() for f in funcs])",
+      "options": ["[0, 1, 2]", "[2, 2, 2]", "[3, 3, 3]", "[0, 0, 0]"],
+      "correct_option_id": 1,
+      "explanation": "Closures capture variable 'i' by reference, which ends at 2 when the loop finishes.",
+      "concept_id": "closure_late_binding",
+      "reasoning_mode": "predict",
+      "difficulty": 3,
+      "track": "code",
+      "category": "Practical Coding & Bug Spotting"
+    },
+    {
+      "question": "In SQL, what is the result of:\nSELECT * FROM items WHERE id NOT IN (1, 2, NULL);",
+      "options": ["All items except 1 and 2", "Empty result set (0 rows)", "All items including 1 and 2", "Syntax error"],
+      "correct_option_id": 1,
+      "explanation": "NOT IN evaluates to UNKNOWN for every row when NULL is present, returning 0 rows.",
+      "concept_id": "sql_null_semantics",
+      "reasoning_mode": "predict",
+      "difficulty": 3,
+      "track": "code",
+      "category": "Practical Coding & Databases"
+    },
+    {
+      "question": "In Python, why is (0.1 + 0.2 == 0.3) False?",
+      "options": ["Integer promotion rule", "IEEE 754 binary floating-point representation rounding", "Python bool bug", "Dynamic typing coercion"],
+      "correct_option_id": 1,
+      "explanation": "0.1 and 0.2 cannot be represented exactly in binary floating point, yielding 0.30000000000000004.",
+      "concept_id": "floating_point_precision",
+      "reasoning_mode": "explain",
+      "difficulty": 2,
+      "track": "code",
+      "category": "Practical Coding & Edge Cases"
+    },
+    {
+      "question": "An asyncio worker calls `time.sleep(5)` inside an async function. What is the immediate impact?",
+      "options": ["Only that coroutine pauses for 5s", "Entire event loop is blocked for 5s", "Asyncio spawns a background thread", "Runtime raises BlockingIOError"],
+      "correct_option_id": 1,
+      "explanation": "`time.sleep` blocks the OS thread running the single-threaded event loop, starving all coroutines.",
+      "concept_id": "async_event_loop_blocking",
+      "reasoning_mode": "predict",
+      "difficulty": 3,
+      "track": "code",
+      "category": "Practical Coding & Concurrency"
+    }
+  ],
+  "sysdesign": [
+    {
+      "question": "A backend service experiences massive latency spikes at 00:00 UTC despite low traffic. What is the most probable architectural cause?",
+      "options": ["Unjittered scheduled cron jobs triggering simultaneously", "Database connection pool leak", "Memory fragmentation compaction", "DNS TTL expiration storm"],
+      "correct_option_id": 0,
+      "explanation": "Unjittered cron jobs configured at midnight trigger simultaneously across nodes, overwhelming backends.",
+      "concept_id": "circuit_breaker_jitter",
+      "reasoning_mode": "diagnose",
+      "difficulty": 2,
+      "track": "sysdesign",
+      "category": "Reliability & Fault Tolerance"
+    },
+    {
+      "question": "A popular cached key expires under 50k QPS, causing all requests to hammer Postgres simultaneously. What pattern directly prevents this?",
+      "options": ["Cache stampede mutex / singleflight", "Replication lag sharding", "Bloom filter query", "LSM-Tree compaction"],
+      "correct_option_id": 0,
+      "explanation": "Singleflight/mutex ensures only one worker rebuilds the cache while others wait or use stale data.",
+      "concept_id": "cache_stampede",
+      "reasoning_mode": "tradeoff",
+      "difficulty": 3,
+      "track": "sysdesign",
+      "category": "Senior System Design & Scalability"
+    },
+    {
+      "question": "Why do LSM-tree storage engines (e.g. RocksDB) typically achieve higher write throughput than B-trees on NVMe drives?",
+      "options": ["Sequential append-only writes vs in-place random updates", "Zero memory usage", "Elimination of indexes", "Synchronous disk flushing"],
+      "correct_option_id": 0,
+      "explanation": "LSM-trees write sequentially to a WAL and memtable, deferring random I/O to background compactions.",
+      "concept_id": "lsm_vs_btree",
+      "reasoning_mode": "tradeoff",
+      "difficulty": 3,
+      "track": "sysdesign",
+      "category": "Databases & Storage Engineering"
+    },
+    {
+      "question": "A payment API receives duplicate network POSTs due to client timeouts. How should the API ensure a credit card is only charged once?",
+      "options": ["Client IP rate limiting", "Idempotency key stored atomically with payment status", "Read Committed transaction", "Two-phase commit coordinator"],
+      "correct_option_id": 1,
+      "explanation": "An idempotency key allows the server to recognize duplicate requests and return the cached receipt.",
+      "concept_id": "idempotency_keys",
+      "reasoning_mode": "tradeoff",
+      "difficulty": 3,
+      "track": "sysdesign",
+      "category": "Senior System Design & Architecture"
+    },
+    {
+      "question": "Downstream database latency increases 5x. Upstream APIs retry every failure 3 times immediately. Traffic spikes 4x and cascades. What is this?",
+      "options": ["Retry storm causing cascading collapse", "Byzantine fault", "Memory leak in GC", "TCP SYN flood attack"],
+      "correct_option_id": 0,
+      "explanation": "Immediate retries multiply traffic onto already struggling downstream services. Use backoff + jitter.",
+      "concept_id": "circuit_breaker_jitter",
+      "reasoning_mode": "diagnose",
+      "difficulty": 2,
+      "track": "sysdesign",
+      "category": "Reliability & Fault Tolerance"
+    }
+  ],
+  "algo": [
+    {
+      "question": "You need to continuously find the rolling median from a real-time data stream of numbers. Which data structure pair gives O(1) median retrieval?",
+      "options": ["Two Heaps (Max Heap + Min Heap)", "Two Balanced BSTs", "Segment Tree + Fenwick Tree", "Circular Queue + Hash Map"],
+      "correct_option_id": 0,
+      "explanation": "A Max-Heap for lower half and Min-Heap for upper half enables O(1) median and O(log N) inserts.",
+      "concept_id": "streaming_two_heaps",
+      "reasoning_mode": "pattern_recognition",
+      "difficulty": 3,
+      "track": "algo",
+      "category": "Algorithmic Patterns & Complexity"
+    },
+    {
+      "question": "You need to find the next greater element for each item in an array of size N in O(N) total time. Which pattern applies?",
+      "options": ["Monotonic Stack", "Two Pointers from ends", "Binary Search Tree", "Trie prefix traversal"],
+      "correct_option_id": 0,
+      "explanation": "A monotonic stack maintains elements in decreasing order, processing each element in amortized O(1).",
+      "concept_id": "monotonic_stack_queue",
+      "reasoning_mode": "pattern_recognition",
+      "difficulty": 3,
+      "track": "algo",
+      "category": "Algorithmic Patterns & Complexity"
+    },
+    {
+      "question": "Which property is GUARANTEED by a standard Bloom filter?",
+      "options": ["Zero false negatives", "Zero false positives", "Constant-time key deletion", "Exact element count retrieval"],
+      "correct_option_id": 0,
+      "explanation": "If an element was added, all k hash bits are set. It can never falsely claim an item is absent.",
+      "concept_id": "bloom_filters",
+      "reasoning_mode": "deduce",
+      "difficulty": 2,
+      "track": "algo",
+      "category": "Algorithmic Patterns & Complexity"
+    },
+    {
+      "question": "You need to detect cycles among package dependencies in a build system. Which algorithmic approach is optimal?",
+      "options": ["Topological Sort (Kahn's or DFS back-edge detection)", "Dijkstra's Shortest Path", "Kruskal's Minimum Spanning Tree", "Binary Heap Priority Queue"],
+      "correct_option_id": 0,
+      "explanation": "Topological sort requires a DAG; inability to include all vertices or a back-edge reveals a cycle.",
+      "concept_id": "topological_sort_dag",
+      "reasoning_mode": "pattern_recognition",
+      "difficulty": 2,
+      "track": "algo",
+      "category": "Algorithmic Patterns & Complexity"
+    },
+    {
+      "question": "Why is row-major iteration over a 2D C/Python array significantly faster than column-major iteration?",
+      "options": ["Spatial cache locality loads contiguous 64-byte cache lines", "CPU branch predictor prefers row indices", "Columns require floating point indexing", "Operating system page faults occur per cell"],
+      "correct_option_id": 0,
+      "explanation": "Contiguous memory layout means row iteration hits CPU L1/L2 cache lines sequentially.",
+      "concept_id": "cache_locality_traversal",
+      "reasoning_mode": "explain",
+      "difficulty": 3,
+      "track": "algo",
+      "category": "Algorithmic Patterns & Complexity"
+    }
+  ],
+  "curiosity": [
+    {
+      "question": "Why did standardizing time zones become critically necessary in the late 19th century?",
+      "options": ["Railways required unified timetables to prevent single-track head-on collisions", "Astronomers requested solar noon alignment", "Telegraph lines could only transmit UTC", "Factory labor laws mandated identical shifts"],
+      "correct_option_id": 0,
+      "explanation": "Hundreds of conflicting local solar times caused train dispatch chaos and fatal collisions.",
+      "concept_id": "railway_time_zones",
+      "reasoning_mode": "curiosity",
+      "difficulty": 2,
+      "track": "curiosity",
+      "category": "Intellectual Curiosity & Mechanisms"
+    },
+    {
+      "question": "GPS satellite atomic clocks must be adjusted daily for relativity. Why do satellite clocks run faster than Earth clocks?",
+      "options": ["General relativity (weaker gravity) dominates special relativity velocity dilation", "Satellites travel faster than light in vacuum", "Solar radiation pressure speeds up quartz crystals", "Satellite clocks experience zero atmospheric friction"],
+      "correct_option_id": 0,
+      "explanation": "Weaker gravity speeds clocks by +45us/day; orbital speed slows them by -7us/day. Net +38us/day.",
+      "concept_id": "gps_relativity_correction",
+      "reasoning_mode": "curiosity",
+      "difficulty": 3,
+      "track": "curiosity",
+      "category": "Intellectual Curiosity & Mechanisms"
+    },
+    {
+      "question": "According to David Ricardo's comparative advantage, why should two countries trade even if one is more productive in every single industry?",
+      "options": ["Both benefit by specializing where their opportunity cost is lowest", "Trade forces equal currency exchange rates", "The superior country consumes all excess surplus", "Tariffs subsidize the less productive nation"],
+      "correct_option_id": 0,
+      "explanation": "Comparative advantage depends on relative opportunity cost, allowing total output to rise through trade.",
+      "concept_id": "comparative_advantage",
+      "reasoning_mode": "curiosity",
+      "difficulty": 2,
+      "track": "curiosity",
+      "category": "Intellectual Curiosity & Mechanisms"
+    },
+    {
+      "question": "In a shared unmetered cloud cluster, teams deploy greedy worker pools until the entire cluster thrashes. Which model explains this?",
+      "options": ["Tragedy of the Commons", "Braess's Paradox", "Cobweb Theorem", "Jevons Paradox"],
+      "correct_option_id": 0,
+      "explanation": "When a shared rivalrous resource has zero cost to the user, individual rationality overexploits it.",
+      "concept_id": "tragedy_of_commons",
+      "reasoning_mode": "curiosity",
+      "difficulty": 2,
+      "track": "curiosity",
+      "category": "Intellectual Curiosity & Mechanisms"
+    }
+  ]
+}

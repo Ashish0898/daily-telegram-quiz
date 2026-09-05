@@ -9,16 +9,45 @@ try:
     from src.config import (
         GEMINI_ENDPOINT, GEMINI_API_KEY, MODEL_NAME,
         OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL,
-        GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL
+        GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL,
+        QUIZ_ENGINE_VERSION
     )
     from src.utils import log_step
 except ImportError:
     from config import (
         GEMINI_ENDPOINT, GEMINI_API_KEY, MODEL_NAME,
         OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL,
-        GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL
+        GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL,
+        QUIZ_ENGINE_VERSION
     )
     from utils import log_step
+
+# V2 engine imports
+try:
+    from src.quiz_selector import build_question_blueprint
+    from src.quiz_validator import validate_question_candidate
+    from src.quiz_critic import (
+        CRITIC_SYSTEM_PROMPT,
+        format_candidate_for_critic,
+        evaluate_critic_response,
+        QUIZ_CRITIC_PROMPT_VERSION
+    )
+    from src.deduplication import generate_question_fingerprint, check_is_duplicate
+    from src.question_modes import get_mode_instruction, get_difficulty_instruction
+except ImportError:
+    from quiz_selector import build_question_blueprint
+    from quiz_validator import validate_question_candidate
+    from quiz_critic import (
+        CRITIC_SYSTEM_PROMPT,
+        format_candidate_for_critic,
+        evaluate_critic_response,
+        QUIZ_CRITIC_PROMPT_VERSION
+    )
+    from deduplication import generate_question_fingerprint, check_is_duplicate
+    from question_modes import get_mode_instruction, get_difficulty_instruction
+
+QUIZ_GENERATOR_PROMPT_VERSION = "v2.0"
+FALLBACKS_FILE_PATH = os.path.join(os.path.dirname(__file__), "fallbacks.json")
 
 logger = logging.getLogger("quiz_generator")
 
@@ -167,14 +196,55 @@ def _clean_math_text(text: str) -> str:
     return text.strip()
 
 
+def _call_llm_pipeline(system_prompt: str, user_prompt: str, temperature: float = 0.7) -> tuple[str | None, str | None, str | None]:
+    """
+    Execute prompt across configured providers: Gemini Direct -> OpenRouter -> Groq.
+    Returns (raw_content, provider_name, model_name).
+    """
+    providers_to_try = []
+
+    # 1. Gemini Direct (primary)
+    if GEMINI_API_KEY:
+        for m in ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.6-flash"]:
+            providers_to_try.append(
+                (f"Gemini Direct ({m})", m, lambda mod=m: _call_gemini_direct(GEMINI_API_KEY, mod, system_prompt, user_prompt, temperature))
+            )
+
+    # 2. OpenRouter (if configured)
+    if OPENROUTER_API_KEY:
+        providers_to_try.append(
+            ("OpenRouter", OPENROUTER_MODEL, lambda: _call_openai_compatible(OPENROUTER_ENDPOINT, OPENROUTER_API_KEY, OPENROUTER_MODEL, system_prompt, user_prompt, temperature, "OpenRouter"))
+        )
+
+    # 3. Groq (if configured)
+    if GROQ_API_KEY:
+        providers_to_try.append(
+            ("Groq", GROQ_MODEL, lambda: _call_openai_compatible(GROQ_ENDPOINT, GROQ_API_KEY, GROQ_MODEL, system_prompt, user_prompt, temperature, "Groq"))
+        )
+
+    for provider_name, model_name, provider_fn in providers_to_try:
+        try:
+            raw_content = provider_fn()
+            if raw_content:
+                logger.info(f"Successfully received response from '{provider_name}'")
+                return raw_content, provider_name, model_name
+        except Exception as err:
+            logger.warning(f"LLM Provider '{provider_name}' failed: {err}")
+
+    return None, None, None
+
+
 @log_step(logger)
-def generate_quiz(track: str = None, topic: str = None) -> dict:
+def generate_quiz(track: str = None, topic: str = None, user_id: int = None) -> dict:
     """
     Generate a high-quality interview, reasoning, or custom domain quiz.
     If topic is provided, generates an engaging question for that custom topic.
     If track is provided ('cognitive', 'code', 'sysdesign', 'algo'), generates for that track.
     Otherwise, picks from today's weekday schedule.
     """
+    if QUIZ_ENGINE_VERSION == "v2":
+        return generate_quiz_v2(track=track, topic=topic, user_id=user_id)
+
     weekday = datetime.now(timezone.utc).weekday()
 
     if topic:
@@ -355,8 +425,23 @@ def generate_quiz(track: str = None, topic: str = None) -> dict:
         return _get_curated_fallback(selected_track)
 
 
-def _get_curated_fallback(track: str) -> dict:
-    """Provide high-quality curated fallbacks for each track."""
+def _get_curated_fallback(track: str = "cognitive") -> dict:
+    """Provide high-quality curated fallback from fallbacks.json or built-in library."""
+    selected_track = track if track in ["cognitive", "code", "sysdesign", "algo", "curiosity"] else "cognitive"
+
+    if os.path.exists(FALLBACKS_FILE_PATH):
+        try:
+            with open(FALLBACKS_FILE_PATH, "r", encoding="utf-8") as f:
+                fallbacks_data = json.load(f)
+                track_fallbacks = fallbacks_data.get(selected_track, fallbacks_data.get("cognitive", []))
+                if track_fallbacks:
+                    choice = dict(random.choice(track_fallbacks))
+                    choice["track"] = selected_track
+                    choice["quality_status"] = "curated_fallback"
+                    return choice
+        except Exception as e:
+            logger.warning(f"Could not load fallbacks.json ({e}). Using built-in fallbacks.")
+
     fallbacks = {
         "cognitive": {
             "question": "A bat and a ball cost $1.10 in total. The bat costs $1.00 more than the ball. How much does the ball cost?",
@@ -364,7 +449,11 @@ def _get_curated_fallback(track: str) -> dict:
             "correct_option_id": 1,
             "explanation": "If the ball is $0.05, the bat is $1.05 ($1.00 more), totaling $1.10. Intuition impulsively says $0.10.",
             "category": "Cognitive Reasoning",
-            "track": "cognitive"
+            "track": "cognitive",
+            "concept_id": "cognitive_reflection",
+            "reasoning_mode": "intuition_trap",
+            "difficulty": 2,
+            "quality_status": "curated_fallback"
         },
         "code": {
             "question": "What is the output of this Python snippet?\n\ndef fn(val, acc=[]):\n    acc.append(val)\n    return len(acc)\n\nprint(fn('a'), fn('b'))",
@@ -372,7 +461,11 @@ def _get_curated_fallback(track: str) -> dict:
             "correct_option_id": 1,
             "explanation": "Default list arguments are evaluated once at function definition and mutated across subsequent calls.",
             "category": "Practical Coding",
-            "track": "code"
+            "track": "code",
+            "concept_id": "python_mutable_defaults",
+            "reasoning_mode": "predict",
+            "difficulty": 2,
+            "quality_status": "curated_fallback"
         },
         "sysdesign": {
             "question": "A backend service experiences massive latency spikes every night at exactly 00:00 UTC despite near-zero user traffic. What is the most probable architectural cause?",
@@ -380,7 +473,11 @@ def _get_curated_fallback(track: str) -> dict:
             "correct_option_id": 0,
             "explanation": "Unjittered cron jobs configured at midnight trigger simultaneously across all nodes, overwhelming backend services.",
             "category": "Senior System Design",
-            "track": "sysdesign"
+            "track": "sysdesign",
+            "concept_id": "circuit_breaker_jitter",
+            "reasoning_mode": "diagnose",
+            "difficulty": 2,
+            "quality_status": "curated_fallback"
         },
         "algo": {
             "question": "You need to continuously calculate the median of a high-throughput incoming data stream of numbers. Which data structure pair gives optimal O(1) median retrieval?",
@@ -388,10 +485,235 @@ def _get_curated_fallback(track: str) -> dict:
             "correct_option_id": 0,
             "explanation": "Maintaining a Max-Heap for the smaller half and a Min-Heap for the larger half allows O(1) median lookups and O(log N) inserts.",
             "category": "Algorithmic Patterns",
-            "track": "algo"
+            "track": "algo",
+            "concept_id": "streaming_two_heaps",
+            "reasoning_mode": "pattern_recognition",
+            "difficulty": 3,
+            "quality_status": "curated_fallback"
+        },
+        "curiosity": {
+            "question": "Why did standardizing time zones become critically necessary in the late 19th century?",
+            "options": ["Railways required unified timetables to prevent single-track collisions", "Astronomers requested solar noon alignment", "Telegraph lines could only transmit UTC", "Factory labor laws mandated identical shifts"],
+            "correct_option_id": 0,
+            "explanation": "Hundreds of conflicting local solar times caused train dispatch chaos and fatal head-on collisions.",
+            "category": "Intellectual Curiosity & Mechanisms",
+            "track": "curiosity",
+            "concept_id": "railway_time_zones",
+            "reasoning_mode": "curiosity",
+            "difficulty": 2,
+            "quality_status": "curated_fallback"
         }
     }
-    return fallbacks.get(track, fallbacks["cognitive"])
+    return fallbacks.get(selected_track, fallbacks["cognitive"])
+
+
+@log_step(logger)
+def generate_quiz_v2(track: str = None, topic: str = None, user_id: int = None) -> dict:
+    """
+    V2 Quiz Generator:
+    1. Builds question blueprint with concept, reasoning mode, and difficulty constraints.
+    2. Generates 3 candidates in a single prompt.
+    3. Runs deterministic rule validation on candidates.
+    4. Evaluates valid candidate with adversarial LLM critic.
+    5. Returns candidate on pass, retries up to 2 attempts, or falls back to curated library.
+    """
+    # 1. Fetch recent history for cooldown and deduplication
+    recent_metadata = []
+    recent_questions = []
+    try:
+        try:
+            from src.db import get_recent_quizzes_metadata, get_recent_questions, get_user_concept_mastery_map
+        except ImportError:
+            from db import get_recent_quizzes_metadata, get_recent_questions, get_user_concept_mastery_map
+
+        recent_metadata = get_recent_quizzes_metadata(limit=30)
+        recent_questions = [m.get("question") for m in recent_metadata if m.get("question")]
+        if not recent_questions:
+            recent_questions = get_recent_questions(limit=15)
+    except Exception as e:
+        logger.warning(f"Failed to query recent quiz history: {e}")
+
+    # User concept mastery
+    user_mastery_map = {}
+    if user_id is not None:
+        try:
+            user_mastery_map = get_user_concept_mastery_map(user_id)
+        except Exception as e:
+            logger.warning(f"Failed to query user mastery: {e}")
+
+    # 2. Build blueprint
+    blueprint = build_question_blueprint(
+        track=track,
+        topic=topic,
+        recent_history=recent_metadata,
+        user_concept_mastery=user_mastery_map
+    )
+    logger.info(f"[V2] Selected Blueprint: Concept='{blueprint.get('concept_name')}', Mode='{blueprint.get('reasoning_mode')}', Diff={blueprint.get('difficulty')}")
+
+    selected_track = blueprint.get("track", "cognitive")
+    mode_instruction = get_mode_instruction(blueprint.get("reasoning_mode"))
+    diff_instruction = get_difficulty_instruction(blueprint.get("difficulty"))
+
+    # 3. System and User Prompt for Candidate Generation
+    system_prompt = (
+        "You are an expert technical interviewer, cognitive puzzle designer, and senior engineering assessment director.\n"
+        "Your task is to generate 3 CANDIDATE multiple-choice questions for the specified concept and reasoning mode.\n"
+        "CRITICAL REQUIREMENTS:\n"
+        "- Require applied reasoning, logic deduction, or system diagnosis. Avoid pure fact memorization.\n"
+        "- Do NOT reuse familiar canonical textbook examples (e.g. standard bat & ball, standard 3 doors Monty Hall).\n"
+        "- Create a novel, realistic scenario.\n"
+        "- Ensure exactly one option is objectively correct and defensible.\n"
+        "- Distractors must represent plausible, realistic intuition traps or common senior misconceptions.\n"
+        "- Telegram Poll Constraints:\n"
+        "  * Question: max 300 characters.\n"
+        "  * Options: exactly 4 options, each max 100 characters.\n"
+        "  * Explanation: STRICTLY 150-195 characters (max 200). Clearly state WHY the right answer is correct and the trap.\n"
+        "  * NO raw LaTeX dollar signs ($) or LaTeX macros. Use clean Unicode or plain text.\n"
+        "Response must be valid JSON ONLY matching schema:\n"
+        "{\n"
+        "  \"candidates\": [\n"
+        "    {\n"
+        "      \"question\": \"...\",\n"
+        "      \"options\": [\"Option A\", \"Option B\", \"Option C\", \"Option D\"],\n"
+        "      \"correct_option_id\": 0,\n"
+        "      \"explanation\": \"...\"\n"
+        "    }\n"
+        "  ]\n"
+        "}"
+    )
+
+    user_prompt = (
+        f"Generate 3 candidate questions for:\n"
+        f"- Concept: {blueprint.get('concept_name')}\n"
+        f"- Subtopic Focus: {blueprint.get('primary_subtopic')}\n"
+        f"- {mode_instruction}\n"
+        f"- {diff_instruction}\n"
+        f"- Objective: {blueprint.get('objective')}\n"
+        f"- Avoid Patterns: {', '.join(blueprint.get('avoid_patterns', []))}\n\n"
+    )
+    if recent_questions:
+        exclusion_list = "\n".join([f"- {q[:80]}" for q in recent_questions[:10]])
+        user_prompt += f"EXCLUDE & DO NOT DUPLICATE THESE RECENT QUESTIONS:\n{exclusion_list}\n\n"
+
+    # Generation loop: max 2 attempts to maintain fast Vercel execution
+    max_attempts = 2
+    for attempt in range(1, max_attempts + 1):
+        temperature = random.uniform(0.65, 0.85)
+        raw_content, provider_name, model_name = _call_llm_pipeline(system_prompt, user_prompt, temperature)
+
+        if not raw_content:
+            logger.warning(f"[V2] Attempt {attempt}: LLM providers failed to return content")
+            continue
+
+        try:
+            cleaned_json_str = raw_content.strip()
+            if cleaned_json_str.startswith("```"):
+                cleaned_json_str = cleaned_json_str.strip("`").replace("json", "", 1).strip()
+
+            parsed = json.loads(cleaned_json_str)
+            candidates = parsed.get("candidates") if isinstance(parsed, dict) and "candidates" in parsed else [parsed]
+            if not isinstance(candidates, list):
+                candidates = [candidates]
+
+            logger.info(f"[V2] Attempt {attempt}: Received {len(candidates)} candidates from {provider_name} ({model_name})")
+
+            for cand_idx, candidate in enumerate(candidates):
+                if not isinstance(candidate, dict):
+                    continue
+
+                # Clean math and text
+                candidate["question"] = _clean_math_text(str(candidate.get("question", "")))
+                candidate["options"] = [_clean_math_text(str(o)) for o in candidate.get("options", [])[:4]]
+                candidate["explanation"] = _clean_math_text(str(candidate.get("explanation", "")))
+
+                # 1. Deterministic rule validation
+                val_result = validate_question_candidate(candidate)
+                if not val_result.is_valid:
+                    logger.info(f"[V2] Candidate {cand_idx} failed deterministic validation: {val_result.issues}")
+                    continue
+
+                # 2. Deduplication check
+                is_dup, dup_reason = check_is_duplicate(candidate["question"], recent_questions)
+                if is_dup:
+                    logger.info(f"[V2] Candidate {cand_idx} rejected as duplicate: {dup_reason}")
+                    continue
+
+                # 3. LLM Critic evaluation
+                critic_prompt = format_candidate_for_critic(candidate, blueprint)
+                critic_raw, _, critic_model = _call_llm_pipeline(CRITIC_SYSTEM_PROMPT, critic_prompt, temperature=0.2)
+
+                if critic_raw:
+                    try:
+                        critic_result = evaluate_critic_response(critic_raw)
+                        logger.info(f"[V2] Candidate {cand_idx} critic score: {critic_result.get('overall_score')}, passed: {critic_result.get('pass')}")
+                        if not critic_result.get("pass"):
+                            logger.info(f"[V2] Candidate {cand_idx} rejected by critic: {critic_result.get('issues')}")
+                            continue
+
+                        # Candidate PASSED both deterministic checks and critic
+                        fingerprint = generate_question_fingerprint(candidate["question"])
+                        candidate["concept_id"] = blueprint.get("concept_id")
+                        candidate["reasoning_mode"] = blueprint.get("reasoning_mode")
+                        candidate["difficulty"] = blueprint.get("difficulty")
+                        candidate["question_fingerprint"] = fingerprint
+                        candidate["quality_score"] = critic_result.get("overall_score", 85)
+                        candidate["generation_attempt"] = attempt
+                        candidate["generation_model"] = model_name or "gemini"
+                        candidate["quality_status"] = "critic_passed"
+                        candidate["interview_relevance"] = blueprint.get("interview_relevance", 8)
+                        candidate["cognitive_value"] = blueprint.get("cognitive_value", 8)
+                        candidate["category"] = blueprint.get("category", "Cognitive Reasoning")
+                        candidate["track"] = selected_track
+                        candidate["critic_review"] = critic_result
+
+                        logger.info(f"[V2] Successfully generated & verified question on attempt {attempt}: '{candidate['question'][:50]}...'")
+                        return candidate
+                    except Exception as crit_err:
+                        logger.warning(f"[V2] Critic parsing failed ({crit_err}). Permitting candidate that passed deterministic checks.")
+                        fingerprint = generate_question_fingerprint(candidate["question"])
+                        candidate["concept_id"] = blueprint.get("concept_id")
+                        candidate["reasoning_mode"] = blueprint.get("reasoning_mode")
+                        candidate["difficulty"] = blueprint.get("difficulty")
+                        candidate["question_fingerprint"] = fingerprint
+                        candidate["quality_score"] = 75
+                        candidate["generation_attempt"] = attempt
+                        candidate["generation_model"] = model_name or "gemini"
+                        candidate["quality_status"] = "deterministic_passed"
+                        candidate["interview_relevance"] = blueprint.get("interview_relevance", 8)
+                        candidate["cognitive_value"] = blueprint.get("cognitive_value", 8)
+                        candidate["category"] = blueprint.get("category", "Cognitive Reasoning")
+                        candidate["track"] = selected_track
+                        return candidate
+                else:
+                    # Critic unavailable, but passed strict deterministic rules
+                    logger.warning("[V2] Critic LLM unavailable; candidate passed strict deterministic validation.")
+                    fingerprint = generate_question_fingerprint(candidate["question"])
+                    candidate["concept_id"] = blueprint.get("concept_id")
+                    candidate["reasoning_mode"] = blueprint.get("reasoning_mode")
+                    candidate["difficulty"] = blueprint.get("difficulty")
+                    candidate["question_fingerprint"] = fingerprint
+                    candidate["quality_score"] = 75
+                    candidate["generation_attempt"] = attempt
+                    candidate["generation_model"] = model_name or "gemini"
+                    candidate["quality_status"] = "deterministic_passed"
+                    candidate["interview_relevance"] = blueprint.get("interview_relevance", 8)
+                    candidate["cognitive_value"] = blueprint.get("cognitive_value", 8)
+                    candidate["category"] = blueprint.get("category", "Cognitive Reasoning")
+                    candidate["track"] = selected_track
+                    return candidate
+
+        except Exception as parse_err:
+            logger.warning(f"[V2] Attempt {attempt} failed during candidate processing: {parse_err}")
+
+    logger.warning("[V2] All generation attempts exhausted or rejected by critic. Using curated fallback.")
+    fallback = dict(_get_curated_fallback(selected_track))
+    if "concept_id" not in fallback:
+        fallback["concept_id"] = blueprint.get("concept_id")
+        fallback["reasoning_mode"] = blueprint.get("reasoning_mode")
+        fallback["difficulty"] = blueprint.get("difficulty")
+    fallback["quality_status"] = "curated_fallback"
+    fallback["question_fingerprint"] = generate_question_fingerprint(fallback["question"])
+    return fallback
 
 
 if __name__ == "__main__":

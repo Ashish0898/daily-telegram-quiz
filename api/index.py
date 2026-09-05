@@ -80,6 +80,9 @@ def parse_command(text: str) -> dict:
     if normalized.startswith("/users"):
         return {"type": "users", "query": None}
 
+    if normalized.startswith("/debug"):
+        return {"type": "debug", "query": None}
+
     return {"type": "help", "query": None}
 
 def build_help_message(is_admin: bool = False) -> str:
@@ -95,6 +98,7 @@ def build_help_message(is_admin: bool = False) -> str:
         "• /quiz code — Practice 'Guess the Output' & Bug Spotting snippets\n"
         "• /quiz sysdesign — Practice System Design & Architecture dilemmas\n"
         "• /quiz algo — Practice Algorithmic Pattern Recognition\n"
+        "• /quiz curiosity — Practice Intellectual Curiosity & Real-world Mechanisms\n"
         "• /leaderboard — View player rankings and accuracy\n"
         "• /help — Show this help message"
     )
@@ -103,7 +107,8 @@ def build_help_message(is_admin: bool = False) -> str:
             "\n\n🛡️ <b>Admin Commands:</b>\n"
             "• /allow &lt;username_or_id&gt; [role] — Grant user access.\n"
             "• /revoke &lt;username_or_id&gt; — Revoke user access.\n"
-            "• /users — List all registered users."
+            "• /users — List all registered users.\n"
+            "• /debug — View Quiz Engine runtime diagnostics."
         )
     return msg
 
@@ -527,6 +532,8 @@ class handler(BaseHTTPRequestHandler):
                     tracks_to_run = ["sysdesign"]
                 elif q_clean in ("algo", "dsa", "patterns", "algorithm"):
                     tracks_to_run = ["algo"]
+                elif q_clean in ("curiosity", "science", "history", "economics", "general"):
+                    tracks_to_run = ["curiosity"]
                 elif q_clean.isdigit():
                     num = max(1, min(int(q_clean), 10))
                     workout_seq = ["cognitive", "code", "sysdesign", "algo"]
@@ -566,8 +573,36 @@ class handler(BaseHTTPRequestHandler):
                         correct_option_id=quiz_data["correct_option_id"],
                         explanation=quiz_data["explanation"],
                         category=quiz_data["category"],
-                        poll_id=None
+                        poll_id=None,
+                        concept_id=quiz_data.get("concept_id"),
+                        reasoning_mode=quiz_data.get("reasoning_mode"),
+                        difficulty=quiz_data.get("difficulty"),
+                        question_fingerprint=quiz_data.get("question_fingerprint"),
+                        quality_score=quiz_data.get("quality_score"),
+                        generation_attempt=quiz_data.get("generation_attempt", 1),
+                        generation_model=quiz_data.get("generation_model"),
+                        quality_status=quiz_data.get("quality_status", "approved"),
+                        interview_relevance=quiz_data.get("interview_relevance"),
+                        cognitive_value=quiz_data.get("cognitive_value")
                     )
+
+                    # If critic review exists, save audit review to quiz_quality_reviews
+                    if quiz_id and quiz_data.get("critic_review"):
+                        from src.db import save_quiz_quality_review
+                        cr = quiz_data["critic_review"]
+                        save_quiz_quality_review(
+                            quiz_id=quiz_id,
+                            passed=cr.get("pass", True),
+                            overall_score=cr.get("overall_score", 80),
+                            technical_correctness=cr.get("technical_correctness"),
+                            reasoning_depth=cr.get("reasoning_depth"),
+                            distractor_quality=cr.get("distractor_quality"),
+                            clarity=cr.get("clarity"),
+                            ambiguity=cr.get("ambiguity"),
+                            memorization_penalty=cr.get("memorization_penalty"),
+                            issues=cr.get("issues"),
+                            review_model=quiz_data.get("generation_model")
+                        )
 
                     if QUIZ_FORMAT == "inline":
                         text = (
@@ -714,6 +749,32 @@ class handler(BaseHTTPRequestHandler):
                 send_message(chat_id, response_text)
                 topic = "list_users"
 
+            elif cmd_type == "debug":
+                from src.config import QUIZ_ENGINE_VERSION
+                from src.db import get_recent_quizzes_metadata
+                recent = get_recent_quizzes_metadata(limit=1)
+                if recent:
+                    r = recent[0]
+                    response_text = (
+                        "🔍 <b>Quiz Engine Diagnostic</b>\n\n"
+                        f"• <b>Engine Version:</b> <code>{QUIZ_ENGINE_VERSION}</code>\n"
+                        f"• <b>Latest Quiz ID:</b> <code>{r.get('id')}</code>\n"
+                        f"• <b>Concept ID:</b> <code>{r.get('concept_id') or 'N/A (legacy)'}</code>\n"
+                        f"• <b>Reasoning Mode:</b> <code>{r.get('reasoning_mode') or 'N/A'}</code>\n"
+                        f"• <b>Difficulty:</b> <code>L{r.get('difficulty') or 'N/A'}</code>\n"
+                        f"• <b>Quality Score:</b> <code>{r.get('quality_score') or 'N/A'}</code>\n"
+                        f"• <b>Question Fingerprint:</b> <code>{r.get('question_fingerprint') or 'N/A'}</code>\n"
+                        f"• <b>Question Stem:</b> <i>{r.get('question', '')[:90]}...</i>"
+                    )
+                else:
+                    response_text = (
+                        f"🔍 <b>Quiz Engine Diagnostic</b>\n\n"
+                        f"• <b>Engine Version:</b> <code>{QUIZ_ENGINE_VERSION}</code>\n"
+                        f"• <i>No recent quiz history found in database.</i>"
+                    )
+                send_message(chat_id, response_text)
+                topic = "debug"
+
             self.send_json(200, {"ok": True})
             log_request(
                 endpoint="webhook",
@@ -798,8 +859,36 @@ class handler(BaseHTTPRequestHandler):
                     correct_option_id=quiz_data["correct_option_id"],
                     explanation=quiz_data["explanation"],
                     category=quiz_data["category"],
-                    poll_id=None
+                    poll_id=None,
+                    concept_id=quiz_data.get("concept_id"),
+                    reasoning_mode=quiz_data.get("reasoning_mode"),
+                    difficulty=quiz_data.get("difficulty"),
+                    question_fingerprint=quiz_data.get("question_fingerprint"),
+                    quality_score=quiz_data.get("quality_score"),
+                    generation_attempt=quiz_data.get("generation_attempt", 1),
+                    generation_model=quiz_data.get("generation_model"),
+                    quality_status=quiz_data.get("quality_status", "approved"),
+                    interview_relevance=quiz_data.get("interview_relevance"),
+                    cognitive_value=quiz_data.get("cognitive_value")
                 )
+
+                # If critic review exists, save audit review to quiz_quality_reviews
+                if quiz_id and quiz_data.get("critic_review"):
+                    from src.db import save_quiz_quality_review
+                    cr = quiz_data["critic_review"]
+                    save_quiz_quality_review(
+                        quiz_id=quiz_id,
+                        passed=cr.get("pass", True),
+                        overall_score=cr.get("overall_score", 80),
+                        technical_correctness=cr.get("technical_correctness"),
+                        reasoning_depth=cr.get("reasoning_depth"),
+                        distractor_quality=cr.get("distractor_quality"),
+                        clarity=cr.get("clarity"),
+                        ambiguity=cr.get("ambiguity"),
+                        memorization_penalty=cr.get("memorization_penalty"),
+                        issues=cr.get("issues"),
+                        review_model=quiz_data.get("generation_model")
+                    )
 
                 poll_ids = []
                 for chat_id in target_ids:

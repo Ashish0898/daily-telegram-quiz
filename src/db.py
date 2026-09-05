@@ -70,7 +70,17 @@ def save_quiz_to_history(
     correct_option_id: int,
     explanation: str = None,
     category: str = None,
-    poll_id: str = None
+    poll_id: str = None,
+    concept_id: str = None,
+    reasoning_mode: str = None,
+    difficulty: int = None,
+    question_fingerprint: str = None,
+    quality_score: int = None,
+    generation_attempt: int = 1,
+    generation_model: str = None,
+    quality_status: str = "approved",
+    interview_relevance: int = None,
+    cognitive_value: int = None
 ) -> int | None:
     """Log a sent quiz to the 'quiz_history' table in Supabase and return the row ID."""
     client = get_supabase_client()
@@ -86,6 +96,23 @@ def save_quiz_to_history(
         "poll_id": poll_id
     }
 
+    # Optional V2 columns
+    v2_fields = {
+        "concept_id": concept_id,
+        "reasoning_mode": reasoning_mode,
+        "difficulty": difficulty,
+        "question_fingerprint": question_fingerprint,
+        "quality_score": quality_score,
+        "generation_attempt": generation_attempt,
+        "generation_model": generation_model,
+        "quality_status": quality_status,
+        "interview_relevance": interview_relevance,
+        "cognitive_value": cognitive_value
+    }
+    for k, v in v2_fields.items():
+        if v is not None:
+            payload[k] = v
+
     try:
         response = client.table("quiz_history").insert(payload).execute()
         logger.info("Saved quiz item to Supabase quiz_history.")
@@ -93,8 +120,23 @@ def save_quiz_to_history(
             return response.data[0].get("id")
         return None
     except Exception as e:
-        logger.error(f"Failed to save quiz to history: {e}")
-        raise
+        logger.warning(f"Failed to insert with full V2 schema ({e}). Retrying with base schema...")
+        base_payload = {
+            "question": question,
+            "options": options,
+            "correct_option_id": correct_option_id,
+            "explanation": explanation,
+            "category": category,
+            "poll_id": poll_id
+        }
+        try:
+            res_base = client.table("quiz_history").insert(base_payload).execute()
+            if res_base.data and len(res_base.data) > 0:
+                return res_base.data[0].get("id")
+            return None
+        except Exception as e2:
+            logger.error(f"Failed to save quiz to history: {e2}")
+            raise
 
 @log_step(logger)
 def is_user_allowed(user_id: int) -> bool:
@@ -355,6 +397,8 @@ def save_user_answer(poll_id: str, user_id: int, username: str, selected_option_
     try:
         client.table("user_quiz_answers").upsert(payload, on_conflict="poll_id,user_id").execute()
         logger.info(f"Successfully saved answer in DB for user {user_id} on poll {poll_id} (is_correct={is_correct})")
+        if quiz_id is not None and is_correct is not None:
+            update_user_mastery_on_answer(user_id, quiz_id, is_correct)
         return True
     except Exception as e:
         logger.error(f"Failed to save user answer to DB: {e}")
@@ -380,6 +424,8 @@ def save_user_inline_answer(quiz_id: int, user_id: int, username: str, selected_
     try:
         client.table("user_quiz_answers").upsert(payload, on_conflict="quiz_id,user_id").execute()
         logger.info(f"Successfully saved inline answer in DB for user {user_id} on quiz {quiz_id}")
+        if is_correct is not None:
+            update_user_mastery_on_answer(user_id, quiz_id, is_correct)
         return True
     except Exception as e:
         logger.error(f"Failed to save user inline answer to DB: {e}")
@@ -591,6 +637,147 @@ def get_recent_questions(category: str = None, limit: int = 15) -> list[str]:
     except Exception as e:
         logger.error(f"Failed to retrieve recent questions: {e}")
         return []
+
+
+@log_step(logger)
+def save_quiz_quality_review(
+    quiz_id: int,
+    passed: bool,
+    overall_score: int,
+    technical_correctness: int = None,
+    reasoning_depth: int = None,
+    distractor_quality: int = None,
+    clarity: int = None,
+    ambiguity: int = None,
+    memorization_penalty: int = None,
+    issues: list = None,
+    review_model: str = None
+) -> bool:
+    """Save an LLM critic quality review to Supabase 'quiz_quality_reviews'."""
+    client = get_supabase_client()
+    if not client:
+        return False
+
+    payload = {
+        "quiz_id": quiz_id,
+        "passed": passed,
+        "overall_score": overall_score,
+        "technical_correctness": technical_correctness,
+        "reasoning_depth": reasoning_depth,
+        "distractor_quality": distractor_quality,
+        "clarity": clarity,
+        "ambiguity": ambiguity,
+        "memorization_penalty": memorization_penalty,
+        "issues": issues or [],
+        "review_model": review_model
+    }
+
+    try:
+        client.table("quiz_quality_reviews").insert(payload).execute()
+        logger.info(f"Saved quality review for quiz_id {quiz_id} (passed={passed}, score={overall_score})")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not insert into 'quiz_quality_reviews' (table might not exist yet): {e}")
+        return False
+
+
+@log_step(logger)
+def get_recent_quizzes_metadata(limit: int = 30) -> list[dict]:
+    """Retrieve recent quiz metadata for cooldown, diversity, and deduplication checks."""
+    client = get_supabase_client()
+    if not client:
+        return []
+
+    try:
+        res = (
+            client.table("quiz_history")
+            .select("id, question, concept_id, reasoning_mode, difficulty, question_fingerprint, created_at")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        return res.data or []
+    except Exception as e:
+        logger.warning(f"Failed to retrieve quiz metadata with V2 columns ({e}). Falling back to questions...")
+        try:
+            res = (
+                client.table("quiz_history")
+                .select("id, question, created_at")
+                .order("created_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return res.data or []
+        except Exception as e2:
+            logger.error(f"Failed to query recent quiz history: {e2}")
+            return []
+
+
+@log_step(logger)
+def get_user_concept_mastery_map(user_id: int) -> dict:
+    """Retrieve all concept mastery records for a user as a dictionary {concept_id: record}."""
+    client = get_supabase_client()
+    if not client or user_id is None:
+        return {}
+
+    try:
+        res = client.table("user_concept_mastery").select("*").eq("user_id", user_id).execute()
+        records = res.data or []
+        return {r.get("concept_id"): r for r in records if r.get("concept_id")}
+    except Exception as e:
+        logger.warning(f"Could not load user concept mastery for user {user_id}: {e}")
+        return {}
+
+
+@log_step(logger)
+def update_user_mastery_on_answer(user_id: int, quiz_id: int, is_correct: bool) -> bool:
+    """Update user concept mastery upon answering a question."""
+    client = get_supabase_client()
+    if not client or user_id is None or quiz_id is None:
+        return False
+
+    try:
+        # 1. Retrieve concept_id from quiz_history
+        hist_resp = client.table("quiz_history").select("concept_id").eq("id", quiz_id).execute()
+        if not hist_resp.data or len(hist_resp.data) == 0:
+            return False
+
+        concept_id = hist_resp.data[0].get("concept_id")
+        if not concept_id:
+            return False
+
+        # 2. Retrieve existing mastery record
+        mastery_resp = (
+            client.table("user_concept_mastery")
+            .select("*")
+            .eq("user_id", user_id)
+            .eq("concept_id", concept_id)
+            .execute()
+        )
+        current_record = mastery_resp.data[0] if (mastery_resp.data and len(mastery_resp.data) > 0) else None
+
+        # 3. Compute updated mastery stats
+        try:
+            from src.mastery import record_user_concept_outcome
+        except ImportError:
+            from mastery import record_user_concept_outcome
+
+        updated_stats = record_user_concept_outcome(current_record, is_correct)
+        updated_stats["user_id"] = user_id
+        updated_stats["concept_id"] = concept_id
+
+        # 4. Upsert into user_concept_mastery
+        client.table("user_concept_mastery").upsert(
+            updated_stats,
+            on_conflict="user_id,concept_id"
+        ).execute()
+
+        logger.info(f"Updated mastery for user {user_id} on concept '{concept_id}': score={updated_stats['mastery_score']}")
+        return True
+    except Exception as e:
+        logger.warning(f"Could not update user concept mastery: {e}")
+        return False
+
 
 
 

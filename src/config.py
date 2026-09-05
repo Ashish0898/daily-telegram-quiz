@@ -42,3 +42,6 @@ TELEGRAM_ADMIN_USERNAME = os.getenv("TELEGRAM_ADMIN_USERNAME", "").strip()
 # Telegram Group / Community Link for unauthorized users
 TELEGRAM_GROUP_LINK = os.getenv("TELEGRAM_GROUP_LINK", "").strip()
 
+# Quiz Engine Version: 'v1' (legacy seed-only) or 'v2' (cognitive blueprint + critic)
+QUIZ_ENGINE_VERSION = os.getenv("QUIZ_ENGINE_VERSION", "v1").strip().lower()
+
